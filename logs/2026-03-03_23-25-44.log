@@ -1,0 +1,16 @@
+[ 2026-03-03 23:25:44,330 ] 20 src.utils.logger - INFO - Starting full data pipeline
+[ 2026-03-03 23:25:44,330 ] 17 src.utils.logger - INFO - Starting data loading process
+[ 2026-03-03 23:25:44,408 ] 22 src.utils.logger - INFO - Datasets loaded successfully
+[ 2026-03-03 23:25:44,408 ] 194 root - INFO - Starting full data transformation process
+[ 2026-03-03 23:25:44,408 ] 13 root - INFO - Generating unique Course IDs
+[ 2026-03-03 23:25:44,415 ] 25 root - INFO - Dropping irrelevant columns
+[ 2026-03-03 23:25:44,419 ] 37 root - INFO - Processing Coursera description
+[ 2026-03-03 23:25:44,421 ] 53 root - INFO - Renaming title columns
+[ 2026-03-03 23:25:44,422 ] 65 root - INFO - Standardizing level columns
+[ 2026-03-03 23:25:44,426 ] 89 root - INFO - Cleaning Udemy duration
+[ 2026-03-03 23:25:44,466 ] 154 root - INFO - Cleaning Coursera duration
+[ 2026-03-03 23:25:44,470 ] 120 root - INFO - Cleaning Coursera reviews and ratings
+[ 2026-03-03 23:25:44,470 ] 171 root - INFO - Merging datasets
+[ 2026-03-03 23:25:44,481 ] 185 root - INFO - Datasets merged successfully
+[ 2026-03-03 23:25:44,481 ] 214 root - INFO - Full data transformation completed successfully
+[ 2026-03-03 23:25:44,581 ] 34 src.utils.logger - INFO - Data pipeline completed successfully

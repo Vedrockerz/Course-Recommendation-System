@@ -1,0 +1,3 @@
+[ 2026-03-03 23:24:50,770 ] 20 src.utils.logger - INFO - Starting full data pipeline
+[ 2026-03-03 23:24:50,771 ] 15 src.utils.logger - INFO - Starting data loading process
+[ 2026-03-03 23:24:50,771 ] 37 src.utils.logger - ERROR - Error in data pipeline
