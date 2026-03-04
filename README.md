@@ -1,4 +1,7 @@
-# 🎓 AI Course Recommendation System
+# 🎓 LearnWise - AI Course Recommendation System
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 An **end-to-end Machine Learning system** that recommends the best online courses from **Udemy and Coursera** based on a user's learning query.
 
@@ -6,7 +9,22 @@ The system uses **TF-IDF, cosine similarity, and hybrid ranking** to return rele
 
 ---
 
-## 🚀 Features
+## 🚀 Live Demo
+👉 **[Open the App](https://learnwise.streamlit.app)**
+
+---
+
+## 📷 App Preview
+
+### 🔎 Search Interface
+![Search UI](images/search_ui.png)
+
+### 🎯 Course Recommendations
+![Recommendations](images/recommendations.png)
+
+---
+
+## ✨ Features
 
 - 🔎 Semantic course search using **TF-IDF**
 - 📊 **Hybrid ranking** (relevance + course quality)
@@ -20,9 +38,9 @@ The system uses **TF-IDF, cosine similarity, and hybrid ranking** to return rele
 
 ---
 
-## 🧠 Project WorkFlow
+## 🔄 Project WorkFlow
 ```mermaid
-graph LR
+graph TD
     A[User Query] --> B[Text Preprocessing]
     B --> C[TF-IDF Vectorization]
     C --> D[Cosine Similarity]
@@ -30,7 +48,7 @@ graph LR
     E --> F[Top Course Recommendations]
 ```
 ---
-## 🏗 Project Structure
+## 📂 Project Structure
 ``` bash
 course-recommendation-system
 │
@@ -61,7 +79,7 @@ course-recommendation-system
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/course-recommendation-system.git
+git clone https://github.com/Vedrockerz/Course-Recommendation-System.git
 cd course-recommendation-system
 ```
 2. **Set up Virtual Environment:**
@@ -105,6 +123,18 @@ streamlit run app/streamlit_app.py
 - Duration
 - Rating
 - Review Count
+
+---
+
+## 🛠 Tech Stack
+
+- **Python**
+- **Scikit-learn**
+- **TF-IDF Vectorization**
+- **Cosine Similarity**
+- **Pandas & NumPy**
+- **Streamlit**
+- **Matplotlib / Seaborn**
 
 ---
 ## 🚧 Phase 2 (Planned)
