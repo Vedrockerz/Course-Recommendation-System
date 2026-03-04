@@ -8,5 +8,6 @@ uvicorn
 python-dotenv
 joblib
 pytest
-streamlit
+streamlit==1.19.0
+altair==4.2.2
 -e .
