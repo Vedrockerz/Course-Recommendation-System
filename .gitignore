@@ -1,0 +1,24 @@
+# Virtual Environment
+.venv/
+
+# Logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Packaging
+*.egg-info/
+build/
+dist/
+
+# Artifacts
+data/artifacts/
+
+# Raw datasets
+data/raw/
+
+# Large processed files (optional)
+data/processed/
