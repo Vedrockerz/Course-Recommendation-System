@@ -8,4 +8,5 @@ uvicorn
 python-dotenv
 joblib
 pytest
+streamlit
 -e .
