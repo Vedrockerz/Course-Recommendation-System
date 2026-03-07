@@ -64,7 +64,7 @@ class HybridRecommender:
 						"Duration_Category",
 						"rating",
 						"reviewcount",
-						"final_score",
+						"course_url",
 					]
 				)
 
@@ -78,7 +78,7 @@ class HybridRecommender:
 				"level",
 				"rating",
 				"reviewcount",
-				"final_score",
+				"course_url",
 			]
 
 			if "Duration_Category" in final_selection.columns:
