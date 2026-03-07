@@ -8,8 +8,8 @@ PROCESSED_DATA_DIR = "data/processed"
 ARTIFACT_DIR = "data/artifacts"
 
 # Raw data files
-COURSERA_FILE = "coursera.csv"
-UDEMY_FILE = "udemy.csv"
+COURSERA_FILE = "coursera_course_2024.csv"
+UDEMY_FILE = "udemy_courses.csv"
 
 FINAL_DATA_FILE = "final_courses.csv"
 

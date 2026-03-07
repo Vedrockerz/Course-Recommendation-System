@@ -11,269 +11,260 @@ from src.config import DataConfig
 
 class DataTransformation:
 
-    def __init__(self):
-        self.config = DataConfig()
-
-    def generate_course_ids(self, df_udemy, df_coursera):
-        try:
-            logging.info("Generating unique Course IDs")
-
-            df_udemy['Course_Id'] = [f'u{i:05d}' for i in range(1, len(df_udemy) + 1)]
-            df_coursera['Course_Id'] = [f'c{i:04d}' for i in range(1, len(df_coursera) + 1)]
-
-            return df_udemy, df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def drop_columns(self, df_udemy, df_coursera):
-        try:
-            logging.info("Dropping irrelevant columns")
-
-            df_udemy.drop(['instructor', 'lectures'], axis=1, inplace=True)
-            df_coursera.drop(['partner', 'certificatetype', 'crediteligibility'], axis=1, inplace=True)
-
-            return df_udemy, df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def process_coursera_description(self, df_coursera):
-        try:
-            logging.info("Processing Coursera description")
-
-            df_coursera['description'] = (
-                df_coursera['course'].fillna('') + " " +
-                df_coursera['skills'].fillna('')
-            )
-
-            df_coursera.drop(['skills'], axis=1, inplace=True)
-
-            return df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def rename_columns(self, df_udemy, df_coursera):
-        try:
-            logging.info("Renaming title columns")
-
-            df_udemy.rename(columns={'title': 'course_title'}, inplace=True)
-            df_coursera.rename(columns={'course': 'course_title'}, inplace=True)
-
-            return df_udemy, df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def standardize_levels(self, df_udemy, df_coursera):
-        try:
-            logging.info("Standardizing level columns")
-
-            df_udemy['level'] = df_udemy['level'].replace({'Expert': 'Advanced'})
-
-            df_coursera['level'] = df_coursera['level'].replace({
-                'Mixed ': 'All Levels',
-                'Intermediate ': 'Intermediate',
-                'Advanced ': 'Advanced',
-                'Beginner ': 'Beginner',
-                'Specialization': 'Advanced',
-                'Degree': 'Advanced',
-                'Course': 'Beginner'
-            })
-
-            df_coursera['level'] = df_coursera['level'].fillna('Beginner')
-            df_udemy['level'] = df_udemy['level'].fillna('All Levels')
-
-            return df_udemy, df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def clean_udemy_duration(self, df_udemy):
-        try:
-            logging.info("Cleaning Udemy duration")
-
-            df_udemy = df_udemy[~df_udemy['duration'].str.contains('questions', case=False, na=False)]
-            df_udemy = df_udemy[~df_udemy['duration'].str.contains('All Levels', case=False, na=False)]
-
-            df_udemy[['duration_val','duration_unit']] = \
-            df_udemy['duration'].str.extract(r'(\d+\.?\d*)\s*([a-zA-Z]+)')
-
-            df_udemy['duration_val'] = df_udemy['duration_val'].astype(float)
-
-            df_udemy.loc[df_udemy['duration_unit'] == 'total mins', 'duration_val'] /= 60
-
-            df_udemy.rename(columns={'duration_val': 'duration_hours'}, inplace=True)
-
-            df_udemy.drop(['duration_unit', 'duration'], axis=1, inplace=True)
-
-            return df_udemy
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def convert_k_to_num(self, val):
-        if pd.isna(val):
-            return 0
-        val = str(val).lower().strip()
-        if 'k' in val:
-            return float(val.replace('k', '')) * 1000
-        return float(val)
-
-    def clean_coursera_reviews(self, df_coursera):
-        try:
-            logging.info("Cleaning Coursera reviews")
-
-            df_coursera['reviewcount'] = df_coursera['reviewcount'].apply(self.convert_k_to_num)
-            df_coursera['rating'] = df_coursera['rating'].fillna(0)
-
-            return df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def standardize_to_months(self, text):
-        if pd.isna(text):
-            return np.nan
-
-        text = str(text).lower()
-        text = text.replace('meses', 'months').replace('mes', 'month').replace('a', '-')
-
-        nums = [float(n) for n in re.findall(r"[-+]?\d*\.\d+|\d+", text)]
-        if not nums:
-            return np.nan
-
-        val = sum(nums) / len(nums)
-
-        if 'year' in text:
-            return val * 12
-        elif 'week' in text:
-            return val / 4.33
-        elif 'hour' in text:
-            return val / 40
-        else:
-            return val
-
-    def clean_coursera_duration(self, df_coursera):
-        try:
-            logging.info("Cleaning Coursera duration")
-
-            df_coursera['duration_months'] = df_coursera['duration'].apply(self.standardize_to_months)
-            df_coursera['duration_hours'] = df_coursera['duration_months'] * 60
-
-            df_coursera.drop(['duration', 'duration_months'], axis=1, inplace=True)
-
-            df_coursera['duration_hours'] = df_coursera['duration_hours'].fillna(0)
-            df_coursera['description'] = df_coursera['description'].fillna(df_coursera['course_title'])
-
-            return df_coursera
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def merge_datasets(self, df_udemy, df_coursera):
-        try:
-            logging.info("Merging datasets")
-
-            df_master = pd.concat([df_coursera, df_udemy], ignore_index=True)
-
-            df_master['platform'] = np.where(
-                df_master['Course_Id'].str.startswith('c'),
-                'Coursera',
-                'Udemy'
-            )
-
-            df_master['Course_Id'] = range(1, len(df_master) + 1)
-
-            df_master = df_master.sample(frac=1, random_state=42).reset_index(drop=True)
-
-            return df_master
-
-        except Exception as e:
-            raise CustomException(e, sys)
-
-    def balance_metadata(self, row):
-
-        title = str(row["course_title"])
-        desc = str(row["description"])
-
-        if row["platform"] == "Coursera":
-            return title + " " + desc
-        else:
-            return title + " " + title + " " + desc
-
-
-    def clean_for_nlp(self, text):
-        if pd.isna(text):
-            return ""
-
-        text = str(text).lower()
-        text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
-
-        return text
-
-    def compute_weighted_score(self, df):
-
-        logging.info("Computing weighted score")
-
-        C = df["rating"].mean()
-
-        m = df["reviewcount"].quantile(0.75)
-
-        df["reviewcount"] = df["reviewcount"].fillna(0)
-        df["rating"] = df["rating"].fillna(0)
-
-        def weighted(row):
-
-            v = row["reviewcount"]
-            R = row["rating"]
-
-            if v + m == 0:
-                return 0
-
-            return (v/(v+m) * R) + (m/(v+m) * C)
-
-        df["weighted_score"] = df.apply(weighted, axis=1)
-
-        return df
-
-    def run_full_transformation(self, df_udemy, df_coursera):
-        try:
-
-            logging.info("Starting full data transformation")
-
-            df_udemy, df_coursera = self.generate_course_ids(df_udemy, df_coursera)
-            df_udemy, df_coursera = self.drop_columns(df_udemy, df_coursera)
-            df_coursera = self.process_coursera_description(df_coursera)
-            df_udemy, df_coursera = self.rename_columns(df_udemy, df_coursera)
-            df_udemy, df_coursera = self.standardize_levels(df_udemy, df_coursera)
-
-            df_udemy = self.clean_udemy_duration(df_udemy)
-            df_coursera = self.clean_coursera_duration(df_coursera)
-            df_coursera = self.clean_coursera_reviews(df_coursera)
-
-            df = self.merge_datasets(df_udemy, df_coursera)
-
-            logging.info("Creating metadata")
-
-            df["metadata_balanced"] = df.apply(self.balance_metadata, axis=1)
-            df["metadata"] = df["metadata_balanced"].apply(self.clean_for_nlp)
-
-            df.drop(["metadata_balanced" , "description"], axis=1, inplace=True)
-
-            logging.info("Adding weighted score")
-
-            df = self.compute_weighted_score(df)
-
-            os.makedirs(self.config.processed_data_dir, exist_ok=True)
-
-            df.to_csv(self.config.final_data_path, index=False)
-
-            logging.info("Processed dataset saved successfully")
-
-            return df
-
-        except Exception as e:
-            raise CustomException(e, sys)
+	def __init__(self):
+		self.config = DataConfig()
+
+	def _normalize_udemy(self, df_udemy: pd.DataFrame) -> pd.DataFrame:
+		df = df_udemy.copy()
+
+		drop_columns = [
+			"id",
+			"num_published_lectures",
+			"created",
+			"last_update_date",
+			"instructors_id",
+		]
+		df.drop(columns=drop_columns, inplace=True, errors="ignore")
+
+		df.rename(
+			columns={
+				"title": "course_title",
+				"num_reviews": "reviewcount",
+				"rating": "rating",
+				"duration": "duration",
+				"url": "course_url",
+				"image": "image",
+			},
+			inplace=True,
+		)
+
+		df["platform"] = "Udemy"
+		df["skills"] = ""
+		df["description"] = ""
+		df["level"] = "All Levels"
+
+		return df
+
+	def _normalize_coursera(self, df_coursera: pd.DataFrame) -> pd.DataFrame:
+		df = df_coursera.copy()
+
+		drop_columns = [
+			"Unnamed: 0",
+			"enrolled",
+			"Instructor",
+			"Organization",
+			"Modules/Courses",
+			"Satisfaction Rate",
+		]
+		df.drop(columns=drop_columns, inplace=True, errors="ignore")
+
+		df.rename(
+			columns={
+				"title": "course_title",
+				"num_reviews": "reviewcount",
+				"rating": "rating",
+				"Schedule": "duration",
+				"URL": "course_url",
+				"Skills": "skills",
+				"Description": "description",
+				"Level": "level",
+			},
+			inplace=True,
+		)
+
+		df["platform"] = "Coursera"
+		df["image"] = np.nan
+
+		return df
+
+	@staticmethod
+	def _to_float(value):
+		if pd.isna(value):
+			return np.nan
+
+		text = str(value).strip()
+
+		if text == "":
+			return np.nan
+
+		text = text.replace(",", "")
+
+		if text.lower() in {"rating not found", "enrollment number not found", "not found"}:
+			return np.nan
+
+		match = re.search(r"(\d+\.?\d*)", text)
+		if match:
+			return float(match.group(1))
+
+		return np.nan
+
+	@staticmethod
+	def _clean_duration(value):
+		if pd.isna(value):
+			return np.nan
+
+		text = str(value).lower().strip()
+
+		if text == "":
+			return np.nan
+
+		match = re.search(r"(\d+\.?\d*)\s*total\s*hours?", text)
+		if match:
+			return float(match.group(1))
+
+		match = re.search(r"(\d+\.?\d*)\s*total\s*mins?", text)
+		if match:
+			return float(match.group(1)) / 60
+
+		match = re.search(r"(\d+\.?\d*)\s*hours?\s*to\s*complete", text)
+		if match:
+			return float(match.group(1))
+
+		match = re.search(r"(\d+\.?\d*)\s*hours?", text)
+		if match:
+			return float(match.group(1))
+
+		if "questions" in text:
+			return np.nan
+
+		return np.nan
+
+	@staticmethod
+	def _duration_category(hours):
+		if pd.isna(hours):
+			return "Unknown"
+		if hours < 3:
+			return "Short"
+		if hours < 15:
+			return "Medium"
+		return "Long"
+
+	@staticmethod
+	def _normalize_level(value):
+		if pd.isna(value):
+			return "All Levels"
+
+		text = str(value).strip()
+		if text == "":
+			return "All Levels"
+
+		text_lower = text.lower()
+
+		if "beginner" in text_lower:
+			return "Beginner"
+		if "intermediate" in text_lower:
+			return "Intermediate"
+		if "advanced" in text_lower:
+			return "Advanced"
+		if "all levels" in text_lower:
+			return "All Levels"
+
+		return text.title()
+
+	@staticmethod
+	def _clean_text_for_metadata(text):
+		value = str(text).lower()
+		value = re.sub(r"http\S+|www\S+", " ", value)
+		value = re.sub(r"\d+", " ", value)
+		value = re.sub(r"[^a-z\s]", " ", value)
+		value = re.sub(r"\b[a-z]{1,2}\b", " ", value)
+		value = re.sub(r"\s+", " ", value).strip()
+		return value
+
+	@staticmethod
+	def _compute_weighted_score(df: pd.DataFrame) -> pd.Series:
+		ratings = df["rating"].fillna(df["rating"].median())
+		reviews = df["reviewcount"].fillna(0)
+
+		c_value = ratings.mean()
+		m_value = reviews.quantile(0.75)
+
+		if pd.isna(m_value) or m_value == 0:
+			m_value = 1.0
+
+		weighted = (
+			(reviews / (reviews + m_value)) * ratings
+			+
+			(m_value / (reviews + m_value)) * c_value
+		)
+
+		return weighted
+
+	def run_full_transformation(self, df_udemy: pd.DataFrame, df_coursera: pd.DataFrame) -> pd.DataFrame:
+		try:
+			logging.info("Starting data transformation")
+
+			udemy = self._normalize_udemy(df_udemy)
+			coursera = self._normalize_coursera(df_coursera)
+
+			logging.info("Merging normalized datasets")
+			df_courses = pd.concat([udemy, coursera], ignore_index=True)
+
+			df_courses.drop_duplicates(subset="course_title", inplace=True)
+
+			df_courses["reviewcount"] = df_courses["reviewcount"].apply(self._to_float)
+			df_courses["rating"] = df_courses["rating"].apply(self._to_float)
+
+			df_courses["reviewcount"] = df_courses["reviewcount"].fillna(0)
+			df_courses["rating"] = df_courses["rating"].fillna(df_courses["rating"].median())
+
+			df_courses["duration_hours"] = df_courses["duration"].apply(self._clean_duration)
+			df_courses["Duration_Category"] = df_courses["duration_hours"].apply(self._duration_category)
+
+			median_duration = df_courses["duration_hours"].median()
+			if pd.isna(median_duration):
+				median_duration = 0
+			df_courses["duration_hours"] = df_courses["duration_hours"].fillna(median_duration)
+
+			df_courses["skills"] = df_courses["skills"].fillna("")
+			df_courses["description"] = df_courses["description"].fillna("")
+			df_courses["level"] = df_courses["level"].apply(self._normalize_level)
+			df_courses["image"] = df_courses["image"].fillna("No_Image")
+
+			df_courses["course_url"] = df_courses["course_url"].fillna("")
+			df_courses["course_url"] = df_courses.apply(
+				lambda row: "https://www.udemy.com" + row["course_url"]
+				if row["platform"] == "Udemy" and str(row["course_url"]).startswith("/")
+				else row["course_url"],
+				axis=1,
+			)
+			df_courses["course_url"] = df_courses["course_url"].astype(str).str.rstrip("/")
+
+			combined_text = (
+				df_courses["course_title"].fillna("")
+				+ " "
+				+ df_courses["description"]
+				+ " "
+				+ df_courses["skills"]
+			)
+
+			df_courses["metadata"] = combined_text.apply(self._clean_text_for_metadata)
+
+			df_courses["weighted_score"] = self._compute_weighted_score(df_courses)
+
+			final_columns = [
+				"course_title",
+				"rating",
+				"reviewcount",
+				"level",
+				"course_url",
+				"image",
+				"platform",
+				"duration_hours",
+				"Duration_Category",
+				"metadata",
+				"weighted_score",
+			]
+
+			final_df = df_courses[final_columns].copy()
+
+			os.makedirs(self.config.processed_data_dir, exist_ok=True)
+			final_df.to_csv(self.config.final_data_path, index=False)
+
+			logging.info("Data transformation completed and saved successfully")
+
+			return final_df
+
+		except Exception as e:
+			logging.error("Error occurred during data transformation")
+			raise CustomException(e, sys)

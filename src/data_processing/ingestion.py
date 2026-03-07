@@ -1,5 +1,4 @@
 import pandas as pd
-import os
 import sys
 from src.utils.logger import logging
 from src.utils.exception import CustomException
@@ -9,8 +8,8 @@ from src.config import DataConfig
 class DataIngestion:
     def __init__(self):
         self.config = DataConfig()
-        self.udemy_path = os.path.join(self.config.raw_data_dir, "udemy.csv")
-        self.coursera_path = os.path.join(self.config.raw_data_dir, "coursera.csv")
+        self.udemy_path = self.config.udemy_path
+        self.coursera_path = self.config.coursera_path
 
     def load_data(self):
         try:
