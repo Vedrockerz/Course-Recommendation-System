@@ -14,5 +14,12 @@ __pycache__/
 build/
 dist/
 
-# Raw datasets
-data/raw/
+# Data folders (keep folder structure only)
+data/raw/*
+!data/raw/.gitkeep
+
+data/processed/*
+!data/processed/.gitkeep
+
+data/artifacts/*
+!data/artifacts/.gitkeep

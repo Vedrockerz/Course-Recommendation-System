@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 import pandas as pd
 
 from src.utils.logger import logging
@@ -7,87 +8,88 @@ from src.utils.exception import CustomException
 
 class HybridRecommender:
 
-    def normalize_scores(self, df):
+	@staticmethod
+	def apply_hybrid_ranking(results_df: pd.DataFrame):
+		ranked_df = results_df.copy()
 
-        try:
+		ranked_df["rating_score"] = ranked_df["rating"].fillna(0) / 5.0
+		ranked_df["popularity_score"] = np.log1p(ranked_df["reviewcount"].fillna(0))
 
-            logging.info("Normalizing weighted score")
+		ranked_df["final_score"] = (
+			0.7 * ranked_df["similarity_score"].fillna(0)
+			+
+			0.2 * ranked_df["rating_score"]
+			+
+			0.1 * ranked_df["popularity_score"]
+		)
 
-            min_score = df["weighted_score"].min()
-            max_score = df["weighted_score"].max()
+		return ranked_df
 
-            if max_score - min_score == 0:
-                df["weighted_score_norm"] = 0
-            else:
-                df["weighted_score_norm"] = (
-                    (df["weighted_score"] - min_score)
-                    /
-                    (max_score - min_score)
-                )
+	def recommend_best_learning(
+		self,
+		results_df,
+		level_filter=None,
+		duration_category_filter=None,
+		max_hours=None,
+		min_hours=None,
+		top_n=5,
+	):
 
-            return df
+		try:
+			logging.info("Applying recommendation filters and hybrid ranking")
 
-        except Exception as e:
-            raise CustomException(e, sys)
+			filtered = results_df.copy()
 
-    def recommend_best_learning(
-        self,
-        results_df,
-        level_filter=None,
-        max_hours=None,
-        min_hours=None,
-        top_n=5
-    ):
+			if level_filter:
+				filtered = filtered[filtered["level"] == level_filter]
 
-        try:
+			duration_col = None
+			if "duration_category" in filtered.columns:
+				duration_col = "duration_category"
+			elif "Duration_Category" in filtered.columns:
+				duration_col = "Duration_Category"
 
-            logging.info("Applying recommendation filters")
+			if duration_category_filter and duration_col:
+				filtered = filtered[
+					filtered[duration_col].astype(str).str.lower()
+					== str(duration_category_filter).strip().lower()
+				]
 
-            if level_filter:
-                results_df = results_df[
-                    results_df["level"] == level_filter
-                ]
+			if filtered.empty:
+				return pd.DataFrame(
+					columns=[
+						"course_title",
+						"platform",
+						"level",
+						"Duration_Category",
+						"rating",
+						"reviewcount",
+						"final_score",
+					]
+				)
 
-            if min_hours is not None:
-                results_df = results_df[
-                    results_df["duration_hours"] >= min_hours
-                ]
+			ranked = self.apply_hybrid_ranking(filtered)
 
-            if max_hours:
-                results_df = results_df[
-                    results_df["duration_hours"] <= max_hours
-                ]
+			final_selection = ranked.sort_values(by="final_score", ascending=False).head(top_n)
 
-            logging.info("Normalizing weighted scores")
+			output_cols = [
+				"course_title",
+				"platform",
+				"level",
+				"rating",
+				"reviewcount",
+				"final_score",
+			]
 
-            results_df = self.normalize_scores(results_df)
+			if "Duration_Category" in final_selection.columns:
+				output_cols.insert(3, "Duration_Category")
+			elif "duration_category" in final_selection.columns:
+				output_cols.insert(3, "duration_category")
 
-            logging.info("Computing hybrid ranking score")
+			if "duration_hours" in final_selection.columns:
+				output_cols.insert(4, "duration_hours")
 
-            results_df["final_score"] = (
-                0.7 * results_df["similarity_score"]
-                +
-                0.3 * results_df["weighted_score_norm"]
-            )
+			return final_selection[output_cols]
 
-            logging.info("Selecting top recommendations")
-
-            final_selection = results_df.sort_values(
-                by="final_score",
-                ascending=False
-            ).head(top_n)
-
-            return final_selection[
-                [
-                    "course_title",
-                    "platform",
-                    "level",
-                    "duration_hours",
-                    "rating",
-                    "reviewcount",
-                    "final_score"
-                ]
-            ]
-
-        except Exception as e:
-            raise CustomException(e, sys)
+		except Exception as e:
+			raise CustomException(e, sys)

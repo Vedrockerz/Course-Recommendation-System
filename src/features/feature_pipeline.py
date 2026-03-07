@@ -1,49 +1,63 @@
 import os
 import sys
 import pickle
+import faiss
 import pandas as pd
 
 from src.utils.logger import logging
 from src.utils.exception import CustomException
 from src.config import DataConfig, ArtifactConfig
 
-from src.features.tfidf_builder import TFIDFBuilder
+from src.features.embedding_builder import EmbeddingBuilder
+from src.features.faiss_index_builder import FaissIndexBuilder
 
 
 class FeaturePipeline:
 
-    def __init__(self):
-        self.data_config = DataConfig()
-        self.artifact_config = ArtifactConfig()
+	def __init__(self):
+		self.data_config = DataConfig()
+		self.artifact_config = ArtifactConfig()
 
-    def run_feature_pipeline(self):
+	def run_feature_pipeline(self):
 
-        try:
+		try:
 
-            logging.info("Loading processed dataset")
+			logging.info("Loading processed dataset for embedding features")
 
-            df = pd.read_csv(self.data_config.final_data_path)
+			df = pd.read_csv(self.data_config.final_data_path)
 
-            logging.info("Building TF-IDF features")
+			df["metadata"] = df["metadata"].fillna("")
+			df = df[df["metadata"].str.strip() != ""].copy()
+			df["metadata"] = df["metadata"].str[:512]
+			df.reset_index(drop=True, inplace=True)
 
-            tfidf_builder = TFIDFBuilder()
-            tfidf, tfidf_matrix = tfidf_builder.build_tfidf(df)
+			texts = df["metadata"].tolist()
 
-            logging.info("Saving dataframe artifact")
+			logging.info("Generating sentence-transformer embeddings")
 
-            os.makedirs(self.artifact_config.artifact_dir, exist_ok=True)
+			embedding_builder = EmbeddingBuilder()
+			embeddings = embedding_builder.build_embeddings(texts)
 
-            df_path = os.path.join(
-                self.artifact_config.artifact_dir,
-                "courses_dataframe.pkl"
-            )
+			logging.info("Generating FAISS index")
 
-            with open(df_path, "wb") as f:
-                pickle.dump(df, f)
+			faiss_builder = FaissIndexBuilder()
+			faiss_index = faiss_builder.build_index(embeddings)
 
-            logging.info("Feature pipeline completed successfully")
+			os.makedirs(self.artifact_config.artifact_dir, exist_ok=True)
 
-            return df, tfidf, tfidf_matrix
+			logging.info("Saving feature artifacts")
 
-        except Exception as e:
-            raise CustomException(e, sys)
+			with open(self.artifact_config.embedding_matrix_path, "wb") as f:
+				pickle.dump(embeddings, f)
+
+			with open(self.artifact_config.courses_dataframe_path, "wb") as f:
+				pickle.dump(df, f)
+
+			faiss.write_index(faiss_index, self.artifact_config.faiss_index_path)
+
+			logging.info("Feature pipeline completed successfully")
+
+			return df, embeddings, faiss_index
+
+		except Exception as e:
+			raise CustomException(e, sys)

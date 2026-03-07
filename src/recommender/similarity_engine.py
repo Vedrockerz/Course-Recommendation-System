@@ -1,6 +1,6 @@
 import sys
-
-from sklearn.metrics.pairwise import cosine_similarity
+import faiss
+import numpy as np
 
 from src.utils.logger import logging
 from src.utils.exception import CustomException
@@ -8,18 +8,16 @@ from src.utils.exception import CustomException
 
 class SimilarityEngine:
 
-    def compute_similarity(self, query_vector, tfidf_matrix):
+	def search(self, query_embedding: np.ndarray, faiss_index, top_k: int):
+		try:
+			logging.info("Running FAISS similarity search")
 
-        try:
+			query_vector = np.array(query_embedding, dtype=np.float32, copy=True)
+			faiss.normalize_L2(query_vector)
 
-            logging.info("Computing cosine similarity between query and course vectors")
+			scores, indices = faiss_index.search(query_vector, top_k)
 
-            similarity_scores = cosine_similarity(
-                query_vector,
-                tfidf_matrix
-            ).flatten()
+			return scores, indices
 
-            return similarity_scores
-
-        except Exception as e:
-            raise CustomException(e, sys)
+		except Exception as e:
+			raise CustomException(e, sys)

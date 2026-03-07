@@ -14,9 +14,13 @@ UDEMY_FILE = "udemy_courses.csv"
 FINAL_DATA_FILE = "final_courses.csv"
 
 # Artifact files
-TFIDF_VECTORIZER_FILE = "tfidf_vectorizer.pkl"
-SIMILARITY_MATRIX_FILE = "similarity_matrix.pkl"
 EMBEDDING_MATRIX_FILE = "embedding_matrix.pkl"  # future use
+FAISS_INDEX_FILE = "course_faiss.index"
+COURSES_DATAFRAME_FILE = "courses_dataframe.pkl"
+
+# Embedding / Retrieval configuration
+SENTENCE_MODEL_NAME = "all-MiniLM-L6-v2"
+FAISS_CANDIDATE_POOL = 50
 
 # Default Recommendation Settings
 DEFAULT_TOP_K = 5

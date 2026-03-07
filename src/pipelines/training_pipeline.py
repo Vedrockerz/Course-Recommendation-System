@@ -43,13 +43,13 @@ class TrainingPipeline:
             # Feature Pipeline
             # -------------------------
 
-            # logging.info("Running Feature Pipeline")
+            logging.info("Running Feature Pipeline")
 
-            # feature_pipeline = FeaturePipeline()
+            feature_pipeline = FeaturePipeline()
 
-            # feature_pipeline.run_feature_pipeline()
+            feature_pipeline.run_feature_pipeline()
 
-            # logging.info("Training Pipeline Completed Successfully")
+            logging.info("Training Pipeline Completed Successfully")
 
         except Exception as e:
             raise CustomException(e, sys)

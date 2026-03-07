@@ -25,9 +25,11 @@ class DataConfig:
 @dataclass
 class ArtifactConfig:
     artifact_dir: str = ARTIFACT_DIR
-    tfidf_vectorizer_path: str = os.path.join(ARTIFACT_DIR, TFIDF_VECTORIZER_FILE)
-    similarity_matrix_path: str = os.path.join(ARTIFACT_DIR, SIMILARITY_MATRIX_FILE)
     embedding_matrix_path: str = os.path.join(ARTIFACT_DIR, EMBEDDING_MATRIX_FILE)
+    faiss_index_path: str = os.path.join(ARTIFACT_DIR, FAISS_INDEX_FILE)
+    courses_dataframe_path: str = os.path.join(ARTIFACT_DIR, COURSES_DATAFRAME_FILE)
+    sentence_model_name: str = SENTENCE_MODEL_NAME
+    faiss_candidate_pool: int = FAISS_CANDIDATE_POOL
 
 
 # =========================
