@@ -30,8 +30,6 @@ class HybridRecommender:
 		results_df,
 		level_filter=None,
 		duration_category_filter=None,
-		max_hours=None,
-		min_hours=None,
 		top_n=5,
 	):
 
@@ -65,6 +63,7 @@ class HybridRecommender:
 						"rating",
 						"reviewcount",
 						"course_url",
+						"image",
 					]
 				)
 
@@ -79,6 +78,7 @@ class HybridRecommender:
 				"rating",
 				"reviewcount",
 				"course_url",
+				"image",
 			]
 
 			if "Duration_Category" in final_selection.columns:

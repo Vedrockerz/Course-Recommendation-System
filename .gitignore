@@ -31,3 +31,8 @@ backend/data/processed/*
 
 backend/data/artifacts/*
 !backend/data/artifacts/.gitkeep
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local

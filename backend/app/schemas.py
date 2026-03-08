@@ -16,6 +16,7 @@ class RecommendationItem(BaseModel):
     rating: Optional[float] = None
     reviewcount: Optional[float] = None
     course_url: Optional[str] = None
+    image: Optional[str] = None
 
 
 class RecommendationResponse(BaseModel):
