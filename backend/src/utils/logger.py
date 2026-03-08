@@ -1,9 +1,9 @@
 import logging
 import os
 from datetime import datetime
+from src.constants import LOG_DIR
 
 # Create logs directory if not exists
-LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Log file name with timestamp

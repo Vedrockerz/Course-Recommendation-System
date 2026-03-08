@@ -1,11 +1,17 @@
+from pathlib import Path
+
 # =========================
 # Project Constants
 # =========================
 
+# Base project path (backend directory)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
 # Data paths
-RAW_DATA_DIR = "data/raw"
-PROCESSED_DATA_DIR = "data/processed"
-ARTIFACT_DIR = "data/artifacts"
+RAW_DATA_DIR = str(BACKEND_DIR / "data" / "raw")
+PROCESSED_DATA_DIR = str(BACKEND_DIR / "data" / "processed")
+ARTIFACT_DIR = str(BACKEND_DIR / "data" / "artifacts")
+LOG_DIR = str(BACKEND_DIR / "logs")
 
 # Raw data files
 COURSERA_FILE = "coursera_course_2024.csv"

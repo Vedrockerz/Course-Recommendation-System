@@ -1,25 +1,33 @@
 # Virtual Environment
 .venv/
+backend/.venv/
+backend/venv/
 
 # Logs
 logs/
 *.log
+backend/logs/
 
 # Python cache
 __pycache__/
 *.pyc
+backend/**/__pycache__/
 
 # Packaging
 *.egg-info/
 build/
 dist/
+backend/*.egg-info/
+backend/build/
+backend/dist/
 
-# Data folders (keep folder structure only)
-data/raw/*
-!data/raw/.gitkeep
 
-data/processed/*
-!data/processed/.gitkeep
+# Backend data folders (keep folder structure only)
+backend/data/raw/*
+!backend/data/raw/.gitkeep
 
-data/artifacts/*
-!data/artifacts/.gitkeep
+backend/data/processed/*
+!backend/data/processed/.gitkeep
+
+backend/data/artifacts/*
+!backend/data/artifacts/.gitkeep

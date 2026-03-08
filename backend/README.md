@@ -49,28 +49,16 @@ graph TD
 ```
 ---
 ## 📂 Project Structure
-``` bash
-course-recommendation-system
-│
-├── data
-│ ├── raw
-│ ├── processed
-│ └── artifacts
-│
-├── src
-│ ├── data
-│ ├── features
-│ ├── recommender
-│ ├── pipelines
-│ └── utils
-│
-├── app
-│ └── streamlit_app.py
-│
-├── config.py
-├── constants.py
-├── requirements.txt
-└── README.md
+```bash
+Course-Recommendation-System/
+├── backend/
+│   ├── app/
+│   ├── data/
+│   ├── src/
+│   ├── tests/
+│   ├── requirements.txt
+│   └── README.md
+└── frontend/   # to be added separately
 ```
 
 ---
@@ -80,7 +68,8 @@ course-recommendation-system
 1. **Clone the repository:**
 ```bash
 git clone https://github.com/Vedrockerz/Course-Recommendation-System.git
-cd course-recommendation-system
+cd Course-Recommendation-System
+cd backend
 ```
 2. **Set up Virtual Environment:**
 ```bash
@@ -97,6 +86,11 @@ pip install -r requirements.txt
 ---
 
 ## 🏃 Running the Project
+If you are at repository root, move into backend first:
+```bash
+cd backend
+```
+
 **1️⃣ Run training pipeline**
 ```bash
 from src.pipelines.training_pipeline import TrainingPipeline
@@ -107,9 +101,15 @@ This creates model artifacts in:
 ```bash
 data/artifacts/
 ```
-**2️⃣ Run frontend**
+
+**2️⃣ Run FastAPI backend**
 ```bash
-streamlit run app/streamlit_app.py
+uvicorn app.main:app --reload
+```
+
+**3️⃣ Run tests**
+```bash
+pytest
 ```
 ---
 
