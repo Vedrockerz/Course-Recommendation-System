@@ -40,8 +40,6 @@ class PredictionPipeline:
         query,
         level=None,
         duration_category=None,
-        max_hours=None,
-        min_hours=None,
         top_k=5,
     ):
 
@@ -66,8 +64,6 @@ class PredictionPipeline:
                 results_df=results,
                 level_filter=level,
                 duration_category_filter=duration_category,
-                max_hours=max_hours,
-                min_hours=min_hours,
                 top_n=top_k
             )
 

@@ -25,7 +25,9 @@ FAISS_INDEX_FILE = "course_faiss.index"
 COURSES_DATAFRAME_FILE = "courses_dataframe.pkl"
 
 # Embedding / Retrieval configuration
-SENTENCE_MODEL_NAME = "all-MiniLM-L6-v2"
+# Multilingual model: supports 50+ languages, handles multilingual course titles
+# without requiring translation.
+SENTENCE_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 FAISS_CANDIDATE_POOL = 50
 
 # Default Recommendation Settings

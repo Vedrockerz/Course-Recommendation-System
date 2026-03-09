@@ -152,7 +152,7 @@ export default function HomePage() {
           isLoading={isLoading}
           hasSearched={hasSearched}
           heading={hasSearched && courses.length > 0 ? "Recommended Courses" : undefined}
-          showSimilarButton={true}
+          showSimilarButton={false}
         />
         <div ref={similarRef}>
           <CourseGrid
