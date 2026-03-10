@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Star, ExternalLink, Copy, Clock, BarChart3, Users } from "lucide-react";
+import { Star, ExternalLink, Copy, Clock, BarChart3, Users, Bookmark, BookmarkCheck, Zap } from "lucide-react";
 import { Course } from "@/services/api";
 
 interface CourseCardProps {
   course: Course;
   onFindSimilar: (courseName: string) => void;
+  onOpenDetail: (course: Course) => void;
   showSimilarButton?: boolean;
 }
 
@@ -53,31 +54,36 @@ function formatCount(count: number): string {
 export default function CourseCard({
   course,
   onFindSimilar,
+  onOpenDetail,
   showSimilarButton = true,
 }: CourseCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
 
   const platformClass = platformStyles[course.platform] || "bg-gray-500/90 text-white";
   const levelClass = levelStyles[course.level] || "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
   const imageSrc = !imgError && course.image ? course.image : FALLBACK_IMAGE;
+  const matchPct = course.similarity_score != null ? Math.round(course.similarity_score * 100) : null;
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl
-                    bg-white dark:bg-gray-900
-                    border border-gray-200/80 dark:border-gray-800
-                    shadow-md hover:shadow-xl dark:shadow-black/20 dark:hover:shadow-black/40
-                    hover:-translate-y-1 transition-all duration-300 ease-out">
-
+    <div
+      className="group relative flex flex-col overflow-hidden rounded-2xl
+                 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md
+                 border border-gray-200/60 dark:border-gray-800/60
+                 shadow-md hover:shadow-2xl dark:shadow-black/20 dark:hover:shadow-black/50
+                 hover:-translate-y-1.5 hover:scale-[1.01]
+                 transition-all duration-300 ease-out cursor-pointer"
+      onClick={() => onOpenDetail(course)}
+    >
       {/* ── Image ── */}
       <div className="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-800">
         <img
           src={imageSrc}
           alt={course.course_title}
           onError={() => setImgError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
         {/* Platform badge */}
         <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wide uppercase backdrop-blur-sm shadow-sm ${platformClass}`}>
@@ -85,14 +91,39 @@ export default function CourseCard({
         </span>
 
         {/* Rating badge */}
-        <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg
+        <div className="absolute top-3 right-12 flex items-center gap-1 px-2 py-1 rounded-lg
                         bg-black/50 backdrop-blur-sm text-white text-xs font-bold shadow-sm">
           <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
           {course.rating?.toFixed(1) ?? "N/A"}
         </div>
 
-        {/* Bottom info on image */}
-        <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
+        {/* Bookmark */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setBookmarked((b) => !b); }}
+          className="absolute top-3 right-3 p-1.5 rounded-lg
+                     bg-black/40 backdrop-blur-sm text-white
+                     hover:bg-black/60 transition-all duration-200"
+          title={bookmarked ? "Remove bookmark" : "Bookmark course"}
+        >
+          {bookmarked ? (
+            <BookmarkCheck className="w-4 h-4 text-amber-400 fill-amber-400" />
+          ) : (
+            <Bookmark className="w-4 h-4" />
+          )}
+        </button>
+
+        {/* Match % badge */}
+        {matchPct != null && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg
+                          bg-gradient-to-r from-emerald-500 to-teal-500
+                          text-white text-xs font-bold shadow-md">
+            <Zap className="w-3 h-3" />
+            {matchPct}% Match
+          </div>
+        )}
+
+        {/* Level badge */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-2">
           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${levelClass}`}>
             {course.level}
           </span>
@@ -113,7 +144,7 @@ export default function CourseCard({
           {course.course_title}
         </h3>
 
-        {/* Stars + review count */}
+        {/* Stars + student count */}
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-bold text-amber-500 dark:text-amber-400">
             {course.rating?.toFixed(1) ?? "—"}
@@ -121,7 +152,7 @@ export default function CourseCard({
           <StarRating rating={course.rating ?? 0} />
           <span className="flex items-center gap-0.5 text-[11px] text-gray-400 dark:text-gray-500 ml-1">
             <Users className="w-3 h-3" />
-            {formatCount(course.reviewcount ?? 0)}
+            {formatCount(course.reviewcount ?? 0)} students
           </span>
         </div>
 
@@ -146,12 +177,13 @@ export default function CourseCard({
               href={course.course_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold
                          bg-gradient-to-r from-indigo-500 to-purple-600 text-white
                          hover:from-indigo-600 hover:to-purple-700
                          shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30
                          dark:shadow-indigo-900/30 dark:hover:shadow-indigo-900/50
-                         transition-all duration-200 active:scale-[0.98]"
+                         transition-all duration-200 active:scale-[0.97]"
             >
               <ExternalLink className="w-4 h-4" />
               View Course
@@ -159,16 +191,16 @@ export default function CourseCard({
           )}
           {showSimilarButton && (
             <button
-              onClick={() => onFindSimilar(course.course_title)}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold
+              onClick={(e) => { e.stopPropagation(); onFindSimilar(course.course_title); }}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold
                          bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
                          border border-gray-200 dark:border-gray-700
                          hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300
                          dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400 dark:hover:border-indigo-800
-                         transition-all duration-200 active:scale-[0.98]"
+                         transition-all duration-200 active:scale-[0.97]"
             >
               <Copy className="w-4 h-4" />
-              Find Similar Courses
+              Find Similar
             </button>
           )}
         </div>

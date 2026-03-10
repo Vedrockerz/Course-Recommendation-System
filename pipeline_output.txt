@@ -1,0 +1,14 @@
+﻿..\.venv\Scripts\python.exe : forrtl: error (200): program aborting due to 
+window-CLOSE event
+At line:1 char:1
++ ..\.venv\Scripts\python.exe -m tests.pipeline_smoke_test 2>&1 | Out-F ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (forrtl: error (...dow-CLOSE event 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Image              PC                Routine            Line        Source     
+        
+KERNELBASE.dll     00007FF920F29DED  Unknown               Unknown  Unknown
+KERNEL32.DLL       00007FF9232FE8D7  Unknown               Unknown  Unknown
+ntdll.dll          00007FF9236CC48C  Unknown               Unknown  Unknown

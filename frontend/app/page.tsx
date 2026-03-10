@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { BookOpen, Sun, Moon, Sparkles, Layers, Zap } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import CourseGrid from "@/components/CourseGrid";
-import { Course, Filters, fetchRecommendations, fetchSimilarCourses } from "@/services/api";
+import CourseDetailModal from "@/components/CourseDetailModal";
+import AIExplanation from "@/components/AIExplanation";
+import {
+  Course, Filters, SortOption,
+  fetchRecommendations, fetchSimilarCourses, sortCourses,
+} from "@/services/api";
 
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -17,6 +22,11 @@ export default function HomePage() {
   const [similarHeading, setSimilarHeading] = useState("");
   const [dark, setDark] = useState(false);
   const [lastFilters, setLastFilters] = useState<Filters>({});
+  const [lastTopK, setLastTopK] = useState(10);
+  const [lastSort, setLastSort] = useState<SortOption>("relevance");
+  const [lastQuery, setLastQuery] = useState("");
+  const [responseTime, setResponseTime] = useState<number | null>(null);
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
 
   const similarRef = useRef<HTMLDivElement>(null);
 
@@ -37,16 +47,32 @@ export default function HomePage() {
     });
   };
 
-  const handleSearch = async (query: string, filters: Filters) => {
+  const applyClientFilters = useCallback((results: Course[], filters: Filters, sort: SortOption): Course[] => {
+    let filtered = results;
+    if (filters.platform) {
+      filtered = filtered.filter((c) => c.platform === filters.platform);
+    }
+    return sortCourses(filtered, sort);
+  }, []);
+
+  const handleSearch = async (query: string, filters: Filters, topK: number, sort: SortOption) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
     setSimilarCourses([]);
     setHasSimilarSearched(false);
     setLastFilters(filters);
+    setLastTopK(topK);
+    setLastSort(sort);
+    setLastQuery(query);
+    setResponseTime(null);
+
+    const start = performance.now();
     try {
-      const data = await fetchRecommendations(query, filters);
-      setCourses(data.results);
+      const data = await fetchRecommendations(query, filters, topK);
+      const elapsed = Math.round(performance.now() - start);
+      setResponseTime(elapsed);
+      setCourses(applyClientFilters(data.results, filters, sort));
     } catch {
       setError("Failed to fetch recommendations. Make sure the backend is running.");
       setCourses([]);
@@ -66,8 +92,8 @@ export default function HomePage() {
     }, 100);
 
     try {
-      const data = await fetchSimilarCourses(courseName, lastFilters);
-      setSimilarCourses(data.results);
+      const data = await fetchSimilarCourses(courseName, lastFilters, lastTopK);
+      setSimilarCourses(applyClientFilters(data.results, lastFilters, lastSort));
     } catch {
       setError("Failed to fetch similar courses. Please try again.");
       setSimilarCourses([]);
@@ -82,8 +108,8 @@ export default function HomePage() {
                     transition-colors duration-300">
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 border-b
-                         bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl
-                         border-gray-200 dark:border-gray-800 transition-colors">
+                         bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl
+                         border-gray-200/80 dark:border-gray-800/80 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -115,14 +141,14 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <section className="pt-16 pb-10 px-4">
         <div className="max-w-4xl mx-auto text-center mb-10">
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-4">
+          <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-4 tracking-tight">
             Find the{" "}
-            <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
               Perfect Course
             </span>{" "}
             for You
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
             Powered by AI to recommend the best courses from Udemy, Coursera, and
             more. Just type what you want to learn.
           </p>
@@ -145,19 +171,29 @@ export default function HomePage() {
       )}
 
       {/* ── Results ── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 space-y-16">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 space-y-10">
         <CourseGrid
           courses={courses}
           onFindSimilar={handleFindSimilar}
+          onOpenDetail={setDetailCourse}
           isLoading={isLoading}
           hasSearched={hasSearched}
           heading={hasSearched && courses.length > 0 ? "Recommended Courses" : undefined}
+          query={lastQuery}
+          responseTime={responseTime}
           showSimilarButton={false}
         />
+
+        {/* AI Explanation */}
+        {hasSearched && !isLoading && courses.length > 0 && (
+          <AIExplanation query={lastQuery} courses={courses} responseTime={responseTime} />
+        )}
+
         <div ref={similarRef}>
           <CourseGrid
             courses={similarCourses}
             onFindSimilar={handleFindSimilar}
+            onOpenDetail={setDetailCourse}
             isLoading={isSimilarLoading}
             hasSearched={hasSimilarSearched}
             heading={similarHeading}
@@ -177,13 +213,15 @@ export default function HomePage() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="rounded-2xl p-6 border shadow-sm
-                           bg-white/70 dark:bg-gray-900/60 backdrop-blur
+                className="group/card rounded-2xl p-6 border
+                           bg-white/60 dark:bg-gray-900/50 backdrop-blur-md
                            border-gray-100 dark:border-gray-800
-                           hover:shadow-md dark:hover:shadow-black/30
-                           transition-shadow duration-200"
+                           shadow-sm hover:shadow-xl dark:hover:shadow-black/30
+                           hover:-translate-y-1
+                           transition-all duration-300"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center mb-4
+                                group-hover/card:scale-110 transition-transform duration-300">
                   <f.Icon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1">{f.title}</h3>
@@ -193,6 +231,9 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Course Detail Modal ── */}
+      <CourseDetailModal course={detailCourse} onClose={() => setDetailCourse(null)} />
     </div>
   );
 }

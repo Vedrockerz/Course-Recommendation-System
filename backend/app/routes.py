@@ -32,6 +32,8 @@ def _format_results(rows) -> List[Dict[str, Any]]:
                 "reviewcount": row.get("reviewcount"),
                 "course_url": row.get("course_url"),
                 "image": row.get("image") if row.get("image") not in (None, "No_Image", "") else None,
+                "similarity_score": row.get("similarity_score"),
+                "metadata": row.get("metadata"),
             }
         )
 

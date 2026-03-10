@@ -81,6 +81,12 @@ class HybridRecommender:
 				"image",
 			]
 
+			if "similarity_score" in final_selection.columns:
+				output_cols.append("similarity_score")
+
+			if "metadata" in final_selection.columns:
+				output_cols.append("metadata")
+
 			if "Duration_Category" in final_selection.columns:
 				output_cols.insert(3, "Duration_Category")
 			elif "duration_category" in final_selection.columns:
