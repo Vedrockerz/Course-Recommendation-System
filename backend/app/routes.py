@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from src.utils.logger import logging
 
 from app.schemas import (
-    HealthResponse,
     RecommendationResponse,
     SimilarResponse,
 )
@@ -41,13 +40,28 @@ def _format_results(rows) -> List[Dict[str, Any]]:
 
 
 @router.get(
-    "/",
-    response_model=HealthResponse,
-    summary="Health check",
+    "/health",
+    summary="Readiness health check",
     tags=["Health"],
 )
-def health_check() -> HealthResponse:
-    return HealthResponse(status="ok", message="AI Course Recommendation API is running")
+def health_check(request: Request) -> Dict[str, str]:
+    if getattr(request.app.state, "is_ready", False):
+        return {"status": "ok"}
+    raise HTTPException(status_code=503, detail="AI recommendation engine is initializing")
+
+
+@router.get(
+    "/",
+    summary="API status",
+    tags=["Health"],
+)
+def root_status() -> Dict[str, str]:
+    return {"status": "running"}
+
+
+def _ensure_engine_ready(request: Request) -> None:
+    if not getattr(request.app.state, "is_ready", False):
+        raise HTTPException(status_code=503, detail="AI recommendation engine is initializing")
 
 
 @router.get(
@@ -100,6 +114,7 @@ def recommend_courses(
 ) -> RecommendationResponse:
     try:
         logging.info("/recommend called")
+        _ensure_engine_ready(request)
 
         artifact_config = request.app.state.artifact_config
         content_model = request.app.state.content_model
@@ -192,6 +207,7 @@ def similar_courses(
 ) -> SimilarResponse:
     try:
         logging.info("/similar called")
+        _ensure_engine_ready(request)
 
         artifact_config = request.app.state.artifact_config
         content_model = request.app.state.content_model

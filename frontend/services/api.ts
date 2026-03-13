@@ -41,6 +41,17 @@ export type SortOption =
   | "shortest"
   | "longest";
 
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${config.apiBaseUrl}/health`, { cache: "no-store" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.status === "ok";
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchRecommendations(
   query: string,
   filters: Filters = {},

@@ -1,5 +1,6 @@
 import pickle
 import faiss
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,10 +30,7 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def startup_event() -> None:
-    logging.info("Starting API and loading recommender artifacts")
-
+def _load_recommender_artifacts() -> dict:
     artifact_config = ArtifactConfig()
 
     with open(artifact_config.courses_dataframe_path, "rb") as f:
@@ -48,14 +46,38 @@ def startup_event() -> None:
 
     hybrid_model = HybridRecommender()
 
-    app.state.artifact_config = artifact_config
-    app.state.df = df
-    app.state.faiss_index = faiss_index
-    app.state.content_model = content_model
-    app.state.hybrid_model = hybrid_model
+    return {
+        "artifact_config": artifact_config,
+        "df": df,
+        "faiss_index": faiss_index,
+        "content_model": content_model,
+        "hybrid_model": hybrid_model,
+    }
 
-    logging.info("Artifacts loaded successfully and kept in memory")
 
+async def _initialize_models(app_ref: FastAPI) -> None:
+    try:
+        logging.info("Starting async artifact loading")
+        artifacts = await asyncio.to_thread(_load_recommender_artifacts)
+
+        app_ref.state.artifact_config = artifacts["artifact_config"]
+        app_ref.state.df = artifacts["df"]
+        app_ref.state.faiss_index = artifacts["faiss_index"]
+        app_ref.state.content_model = artifacts["content_model"]
+        app_ref.state.hybrid_model = artifacts["hybrid_model"]
+        app_ref.state.is_ready = True
+
+        logging.info("Artifacts loaded successfully and kept in memory")
+    except Exception:
+        app_ref.state.is_ready = False
+        logging.exception("Artifact initialization failed")
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    logging.info("Starting API and scheduling recommender initialization")
+    app.state.is_ready = False
+    app.state.init_task = asyncio.create_task(_initialize_models(app))
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:

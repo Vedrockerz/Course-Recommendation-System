@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { BookOpen, Sun, Moon, Sparkles, Layers, Zap } from "lucide-react";
+import { BookOpen, Sun, Moon, Sparkles, Layers, Zap, Loader2, CheckCircle2 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import CourseGrid from "@/components/CourseGrid";
 import CourseDetailModal from "@/components/CourseDetailModal";
 import AIExplanation from "@/components/AIExplanation";
 import {
   Course, Filters, SortOption,
-  fetchRecommendations, fetchSimilarCourses, sortCourses,
+  checkBackendHealth, fetchRecommendations, fetchSimilarCourses, sortCourses,
 } from "@/services/api";
+
+const HEALTH_CHECK_INTERVAL_MS = 1000;
+const MAX_HEALTH_RETRIES = 30;
 
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -27,6 +30,10 @@ export default function HomePage() {
   const [lastQuery, setLastQuery] = useState("");
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  const [isBackendReady, setIsBackendReady] = useState(false);
+  const [isCheckingBackend, setIsCheckingBackend] = useState(true);
+  const [backendRetryCount, setBackendRetryCount] = useState(0);
+  const [backendConnectionError, setBackendConnectionError] = useState<string | null>(null);
 
   const similarRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +43,46 @@ export default function HomePage() {
       setDark(true);
       document.documentElement.classList.add("dark");
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const checkBackendUntilReady = async () => {
+      setIsCheckingBackend(true);
+      setBackendConnectionError(null);
+
+      let attempt = 0;
+      while (!cancelled) {
+        attempt += 1;
+        const healthy = await checkBackendHealth();
+        if (cancelled) return;
+
+        if (healthy) {
+          setIsBackendReady(true);
+          setIsCheckingBackend(false);
+          setBackendRetryCount(attempt - 1);
+          setBackendConnectionError(null);
+          return;
+        }
+
+        setBackendRetryCount(attempt);
+
+        if (attempt >= MAX_HEALTH_RETRIES) {
+          setBackendConnectionError("Unable to connect to AI recommendation service.");
+        }
+
+        await wait(HEALTH_CHECK_INTERVAL_MS);
+      }
+    };
+
+    void checkBackendUntilReady();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const toggleDark = () => {
@@ -56,6 +103,11 @@ export default function HomePage() {
   }, []);
 
   const handleSearch = async (query: string, filters: Filters, topK: number, sort: SortOption) => {
+    if (!isBackendReady) {
+      setError("Initializing AI Recommendation Engine...");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
@@ -82,6 +134,11 @@ export default function HomePage() {
   };
 
   const handleFindSimilar = async (courseName: string) => {
+    if (!isBackendReady) {
+      setError("Initializing AI Recommendation Engine...");
+      return;
+    }
+
     setIsSimilarLoading(true);
     setHasSimilarSearched(true);
     setSimilarHeading(`Courses similar to "${courseName}"`);
@@ -152,8 +209,37 @@ export default function HomePage() {
             Powered by AI to recommend the best courses from Udemy, Coursera, and
             more. Just type what you want to learn.
           </p>
+
+          {isBackendReady && (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5
+                            bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">AI Engine Ready</span>
+            </div>
+          )}
         </div>
-        <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+
+        {!isBackendReady && isCheckingBackend && (
+          <div className="max-w-3xl mx-auto mb-4 rounded-2xl border border-indigo-200/70 dark:border-indigo-700/40
+                          bg-white/80 dark:bg-gray-900/70 backdrop-blur-xl px-4 py-3.5 shadow-sm">
+            <div className="flex items-center gap-3 text-indigo-700 dark:text-indigo-300">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <div className="text-sm sm:text-base font-medium">Initializing AI Recommendation Engine...</div>
+            </div>
+            <p className="mt-1 text-xs text-indigo-600/80 dark:text-indigo-300/80">
+              Waiting for backend readiness. Retry attempt: {backendRetryCount}
+            </p>
+          </div>
+        )}
+
+        {backendConnectionError && (
+          <div className="max-w-3xl mx-auto mb-4 rounded-2xl border border-red-200 dark:border-red-800/50
+                          bg-red-50/80 dark:bg-red-900/20 px-4 py-3.5">
+            <p className="text-sm text-red-700 dark:text-red-300 font-medium">{backendConnectionError}</p>
+          </div>
+        )}
+
+        <SearchBar onSearch={handleSearch} isLoading={isLoading} isBackendReady={isBackendReady} />
       </section>
 
       {/* ── Error ── */}

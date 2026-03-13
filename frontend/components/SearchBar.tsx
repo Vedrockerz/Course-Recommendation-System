@@ -1,24 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Search, Loader2, SlidersHorizontal, ChevronDown, X } from "lucide-react";
+import { Search, Loader2, ChevronDown, X } from "lucide-react";
 import type { Filters, SortOption } from "@/services/api";
 
 interface SearchBarProps {
   onSearch: (query: string, filters: Filters, topK: number, sort: SortOption) => void;
   isLoading: boolean;
+  isBackendReady: boolean;
 }
 
 const LEVELS = ["All", "Beginner", "Intermediate", "Advanced"];
 const DURATIONS = ["All", "Short", "Medium", "Long"];
-const PLATFORMS = ["All", "Udemy", "Coursera"];
+const PLATFORMS = ["All", "Udemy", "Coursera", "YouTube"];
 const TOP_K_OPTIONS = [5, 10, 20, 50];
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "relevance", label: "Relevance" },
   { value: "rating", label: "Highest Rating" },
   { value: "students", label: "Most Students" },
   { value: "shortest", label: "Shortest Duration" },
-  { value: "longest", label: "Longest Duration" },
 ];
 
 const SUGGESTIONS = [
@@ -44,14 +44,13 @@ const SUGGESTIONS = [
   "Computer Vision",
 ];
 
-export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
+export default function SearchBar({ onSearch, isLoading, isBackendReady }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState("All");
   const [duration, setDuration] = useState("All");
   const [platform, setPlatform] = useState("All");
   const [topK, setTopK] = useState(10);
   const [sort, setSort] = useState<SortOption>("relevance");
-  const [showFilters, setShowFilters] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
@@ -82,6 +81,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isBackendReady) return;
     const trimmed = query.trim();
     if (!trimmed) return;
     setShowSuggestions(false);
@@ -92,7 +92,27 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     onSearch(trimmed, filters, topK, sort);
   };
 
+  const runSearchIfPossible = (
+    nextLevel: string,
+    nextDuration: string,
+    nextPlatform: string,
+    nextTopK: number,
+    nextSort: SortOption
+  ) => {
+    if (!isBackendReady || isLoading) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    const filters: Filters = {};
+    if (nextLevel !== "All") filters.level = nextLevel;
+    if (nextDuration !== "All") filters.duration_category = nextDuration;
+    if (nextPlatform !== "All") filters.platform = nextPlatform;
+
+    onSearch(trimmed, filters, nextTopK, nextSort);
+  };
+
   const selectSuggestion = (s: string) => {
+    if (!isBackendReady) return;
     setQuery(s);
     setShowSuggestions(false);
     const filters: Filters = {};
@@ -120,6 +140,24 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
 
   const hasActiveFilters = level !== "All" || duration !== "All" || platform !== "All" || topK !== 10 || sort !== "relevance";
 
+  const resetFilters = () => {
+    setLevel("All");
+    setDuration("All");
+    setPlatform("All");
+    setTopK(10);
+    setSort("relevance");
+    runSearchIfPossible("All", "All", "All", 10, "relevance");
+  };
+
+  const selectClassName = (isActive: boolean) =>
+    `w-full appearance-none pl-3 pr-8 py-2 rounded-xl text-sm font-medium border bg-white dark:bg-gray-800
+     focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors cursor-pointer
+     disabled:opacity-60 disabled:cursor-not-allowed ${
+       isActive
+         ? "border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
+         : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+     }`;
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-3">
       <form onSubmit={handleSubmit}>
@@ -128,6 +166,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           <input
             ref={inputRef}
             type="text"
+            disabled={!isBackendReady || isLoading}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -136,7 +175,11 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
             }}
             onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
             onKeyDown={handleKeyDown}
-            placeholder='Search courses... e.g. "machine learning", "python data science"'
+            placeholder={
+              isBackendReady
+                ? 'Search courses... e.g. "machine learning", "python data science"'
+                : "Initializing AI Recommendation Engine..."
+            }
             className="w-full pl-12 pr-36 py-4 rounded-2xl
                        border border-gray-200 dark:border-gray-700
                        bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl
@@ -178,22 +221,8 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
 
           <div className="absolute right-2 flex items-center gap-1.5">
             <button
-              type="button"
-              onClick={() => setShowFilters((v) => !v)}
-              className={`relative p-2.5 rounded-xl transition-all duration-200
-                         ${showFilters
-                           ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400"
-                           : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-500"}`}
-              title="Toggle filters"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {hasActiveFilters && (
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-indigo-500 rounded-full" />
-              )}
-            </button>
-            <button
               type="submit"
-              disabled={isLoading || !query.trim()}
+              disabled={!isBackendReady || isLoading || !query.trim()}
               className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600
                          text-white font-semibold rounded-xl
                          hover:from-indigo-600 hover:to-purple-700
@@ -207,6 +236,8 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="hidden sm:inline">Searching</span>
                 </>
+              ) : !isBackendReady ? (
+                "Waiting"
               ) : (
                 "Search"
               )}
@@ -215,129 +246,154 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         </div>
       </form>
 
-      {/* Filter & Controls bar */}
-      {showFilters && (
-        <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 rounded-xl
-                        bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl
-                        border border-gray-200 dark:border-gray-700 shadow-sm
-                        transition-all duration-300">
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+      {/* Always-visible Filter & Controls row */}
+      <div className="px-4 py-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-700/80
+                      bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mr-1">
             Filters
           </span>
 
-          {/* Level */}
-          <div className="relative">
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 rounded-lg text-sm font-medium
-                         border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800
-                         text-gray-700 dark:text-gray-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500
-                         transition-colors cursor-pointer"
-            >
-              {LEVELS.map((l) => (
-                <option key={l} value={l}>{l === "All" ? "All Levels" : l}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-          </div>
-
-          {/* Duration */}
-          <div className="relative">
-            <select
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 rounded-lg text-sm font-medium
-                         border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800
-                         text-gray-700 dark:text-gray-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500
-                         transition-colors cursor-pointer"
-            >
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>{d === "All" ? "All Durations" : d}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-          </div>
-
-          {/* Platform */}
-          <div className="relative">
+          <div className="relative min-w-[150px] flex-1 sm:flex-none">
             <select
               value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 rounded-lg text-sm font-medium
-                         border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800
-                         text-gray-700 dark:text-gray-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500
-                         transition-colors cursor-pointer"
+              disabled={!isBackendReady || isLoading}
+              onChange={(e) => {
+                const next = e.target.value;
+                setPlatform(next);
+                runSearchIfPossible(level, duration, next, topK, sort);
+              }}
+              className={selectClassName(platform !== "All")}
             >
               {PLATFORMS.map((p) => (
-                <option key={p} value={p}>{p === "All" ? "All Platforms" : p}</option>
+                <option key={p} value={p}>{p === "All" ? "Platform: All" : p}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block" />
-
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Results
-          </span>
-
-          {/* Top K */}
-          <div className="relative">
+          <div className="relative min-w-[150px] flex-1 sm:flex-none">
             <select
-              value={topK}
-              onChange={(e) => setTopK(Number(e.target.value))}
-              className="appearance-none pl-3 pr-7 py-1.5 rounded-lg text-sm font-medium
-                         border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800
-                         text-gray-700 dark:text-gray-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500
-                         transition-colors cursor-pointer"
+              value={level}
+              disabled={!isBackendReady || isLoading}
+              onChange={(e) => {
+                const next = e.target.value;
+                setLevel(next);
+                runSearchIfPossible(next, duration, platform, topK, sort);
+              }}
+              className={selectClassName(level !== "All")}
             >
-              {TOP_K_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n} results</option>
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>{l === "All" ? "Level: All" : l}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Sort */}
-          <div className="relative">
+          <div className="relative min-w-[150px] flex-1 sm:flex-none">
+            <select
+              value={duration}
+              disabled={!isBackendReady || isLoading}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDuration(next);
+                runSearchIfPossible(level, next, platform, topK, sort);
+              }}
+              className={selectClassName(duration !== "All")}
+            >
+              {DURATIONS.map((d) => (
+                <option key={d} value={d}>{d === "All" ? "Duration: All" : d}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+
+          <div className="relative min-w-[170px] flex-1 sm:flex-none">
             <select
               value={sort}
-              onChange={(e) => setSort(e.target.value as SortOption)}
-              className="appearance-none pl-3 pr-7 py-1.5 rounded-lg text-sm font-medium
-                         border border-gray-200 dark:border-gray-700
-                         bg-white dark:bg-gray-800
-                         text-gray-700 dark:text-gray-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500
-                         transition-colors cursor-pointer"
+              disabled={!isBackendReady || isLoading}
+              onChange={(e) => {
+                const next = e.target.value as SortOption;
+                setSort(next);
+                runSearchIfPossible(level, duration, platform, topK, next);
+              }}
+              className={selectClassName(sort !== "relevance")}
             >
               {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>Sort: {o.label}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={() => { setLevel("All"); setDuration("All"); setPlatform("All"); setTopK(10); setSort("relevance"); }}
-              className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium ml-auto"
+          <div className="relative min-w-[130px] flex-1 sm:flex-none">
+            <select
+              value={topK}
+              disabled={!isBackendReady || isLoading}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setTopK(next);
+                runSearchIfPossible(level, duration, platform, next, sort);
+              }}
+              className={selectClassName(topK !== 10)}
             >
-              <X className="w-3 h-3" />
-              Clear all
-            </button>
-          )}
+              {TOP_K_OPTIONS.map((n) => (
+                <option key={n} value={n}>Results: {n}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+
+          <button
+            type="button"
+            disabled={!isBackendReady || isLoading || !hasActiveFilters}
+            onClick={resetFilters}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium
+                       border border-gray-200 dark:border-gray-700
+                       bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                       hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed
+                       transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear Filters
+          </button>
         </div>
-      )}
+
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {platform !== "All" && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium
+                               bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Platform: {platform}
+              </span>
+            )}
+            {level !== "All" && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium
+                               bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Level: {level}
+              </span>
+            )}
+            {duration !== "All" && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium
+                               bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Duration: {duration}
+              </span>
+            )}
+            {sort !== "relevance" && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium
+                               bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Sort: {SORT_OPTIONS.find((o) => o.value === sort)?.label}
+              </span>
+            )}
+            {topK !== 10 && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium
+                               bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                Results: {topK}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
