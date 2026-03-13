@@ -7,6 +7,7 @@ matplotlib
 seaborn
 fastapi
 uvicorn
+requests
 python-dotenv
 joblib
 pytest

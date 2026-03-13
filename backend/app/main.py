@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config import ArtifactConfig
 from src.recommender.content_recommender import ContentRecommender
 from src.recommender.hybrid_recommender import HybridRecommender
+from src.utils.artifact_loader import ensure_startup_artifacts
 from src.utils.logger import logging
 
 from app.routes import router
@@ -57,7 +58,10 @@ def _load_recommender_artifacts() -> dict:
 
 async def _initialize_models(app_ref: FastAPI) -> None:
     try:
-        logging.info("Starting async artifact loading")
+        logging.info("Starting startup artifact availability check")
+        await asyncio.to_thread(ensure_startup_artifacts)
+
+        logging.info("Starting async recommender model loading")
         artifacts = await asyncio.to_thread(_load_recommender_artifacts)
 
         app_ref.state.artifact_config = artifacts["artifact_config"]
