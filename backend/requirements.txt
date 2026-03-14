@@ -7,7 +7,9 @@ matplotlib
 seaborn
 fastapi
 uvicorn
+huggingface-hub
 requests
+torch
 python-dotenv
 joblib
 pytest
