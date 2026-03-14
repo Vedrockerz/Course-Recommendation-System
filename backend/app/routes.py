@@ -58,7 +58,7 @@ def health_check(request: Request) -> Dict[str, str]:
     tags=["Health"],
 )
 def root_status() -> Dict[str, str]:
-    return {"status": "running", "message": "AI Course Recommendation API is live"}
+    return {"status": "backend running"}
 
 
 def _ensure_engine_ready(request: Request) -> None:

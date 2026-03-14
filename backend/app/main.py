@@ -6,8 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import ArtifactConfig
-from src.recommender.content_recommender import ContentRecommender
-from src.recommender.hybrid_recommender import HybridRecommender
 from src.utils.artifact_loader import ensure_startup_artifacts
 from src.utils.logger import logging
 
@@ -32,6 +30,10 @@ app.add_middleware(
 
 
 def _load_recommender_artifacts() -> dict:
+    # Import heavy recommender modules lazily so process startup can bind port quickly.
+    from src.recommender.content_recommender import ContentRecommender
+    from src.recommender.hybrid_recommender import HybridRecommender
+
     artifact_config = ArtifactConfig()
 
     logging.info("Loading dataset artifact from %s", artifact_config.courses_dataframe_path)
@@ -89,9 +91,11 @@ async def _initialize_models(app_ref: FastAPI) -> None:
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    logging.info("Starting API and scheduling background recommender warmup")
+    logging.info("Server startup event triggered")
+    logging.info("Scheduling background recommender warmup")
     app.state.is_ready = False
     app.state.init_task = asyncio.create_task(_initialize_models(app))
+    logging.info("Startup event completed; waiting for warmup readiness")
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:

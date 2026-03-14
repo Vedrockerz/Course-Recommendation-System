@@ -9,8 +9,7 @@ def test_health_endpoint():
 
         assert response.status_code == 200
         payload = response.json()
-        assert payload["status"] == "ok"
-        assert "running" in payload["message"].lower()
+        assert payload["status"] == "backend running"
 
 
 def test_recommend_endpoint():
