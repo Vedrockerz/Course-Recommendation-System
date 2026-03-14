@@ -89,9 +89,9 @@ async def _initialize_models(app_ref: FastAPI) -> None:
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    logging.info("Starting API and initializing recommender resources")
+    logging.info("Starting API and scheduling background recommender warmup")
     app.state.is_ready = False
-    await _initialize_models(app)
+    app.state.init_task = asyncio.create_task(_initialize_models(app))
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
