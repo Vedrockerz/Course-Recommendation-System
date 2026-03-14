@@ -14,9 +14,11 @@ from src.recommender.similarity_engine import SimilarityEngine
 class ContentRecommender:
 
 	def __init__(self, df, faiss_index, model_name):
-		self.df = df.copy()
+		self.df = df
 		self.faiss_index = faiss_index
 		self.model = SentenceTransformer(model_name)
+		self.course_titles = self.df["course_title"].astype(str).tolist()
+		self.course_to_idx = pd.Series(self.df.index, index=self.df["course_title"]).drop_duplicates()
 		self.sim_engine = SimilarityEngine()
 
 	@staticmethod
@@ -25,9 +27,6 @@ class ContentRecommender:
 		text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
 		text = re.sub(r"\s+", " ", text).strip()
 		return text
-
-	def _course_index_map(self):
-		return pd.Series(self.df.index, index=self.df["course_title"]).drop_duplicates()
 
 	def _hybrid_scoring(self, scores, indices):
 		selected_indices = []
@@ -59,12 +58,10 @@ class ContentRecommender:
 	def recommend_by_course_name(self, course_name, candidate_pool=50):
 		logging.info("Generating recommendations from matched course name")
 
-		course_to_idx = self._course_index_map()
-
-		if course_name not in course_to_idx:
+		if course_name not in self.course_to_idx:
 			return pd.DataFrame(columns=list(self.df.columns) + ["similarity_score"])
 
-		idx = int(course_to_idx[course_name])
+		idx = int(self.course_to_idx[course_name])
 		query_vector = np.array(self.faiss_index.reconstruct(idx), dtype=np.float32).reshape(1, -1)
 
 		scores, indices = self.sim_engine.search(query_vector, self.faiss_index, candidate_pool)
@@ -73,7 +70,7 @@ class ContentRecommender:
 
 	def get_recommendations(self, query, candidate_pool=50):
 		try:
-			match = get_close_matches(query, self.df["course_title"].astype(str).tolist(), n=1, cutoff=0.8)
+			match = get_close_matches(query, self.course_titles, n=1, cutoff=0.8)
 
 			if match:
 				return self.recommend_by_course_name(match[0], candidate_pool=candidate_pool)

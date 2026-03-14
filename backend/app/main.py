@@ -34,16 +34,24 @@ app.add_middleware(
 def _load_recommender_artifacts() -> dict:
     artifact_config = ArtifactConfig()
 
+    logging.info("Loading dataset artifact from %s", artifact_config.courses_dataframe_path)
     with open(artifact_config.courses_dataframe_path, "rb") as f:
         df = pickle.load(f)
+    logging.info("Dataset loaded: %s rows", len(df))
 
+    logging.info("Loading FAISS index from %s", artifact_config.faiss_index_path)
     faiss_index = faiss.read_index(artifact_config.faiss_index_path)
+    logging.info("FAISS index loaded: %s vectors", faiss_index.ntotal)
 
+    title_lookup = {str(title).strip().lower(): str(title) for title in df["course_title"].astype(str).tolist()}
+
+    logging.info("Loading multilingual embedding model: %s", artifact_config.sentence_model_name)
     content_model = ContentRecommender(
         df=df,
         faiss_index=faiss_index,
         model_name=artifact_config.sentence_model_name,
     )
+    logging.info("Embedding model loaded")
 
     hybrid_model = HybridRecommender()
 
@@ -51,6 +59,7 @@ def _load_recommender_artifacts() -> dict:
         "artifact_config": artifact_config,
         "df": df,
         "faiss_index": faiss_index,
+        "title_lookup": title_lookup,
         "content_model": content_model,
         "hybrid_model": hybrid_model,
     }
@@ -67,11 +76,12 @@ async def _initialize_models(app_ref: FastAPI) -> None:
         app_ref.state.artifact_config = artifacts["artifact_config"]
         app_ref.state.df = artifacts["df"]
         app_ref.state.faiss_index = artifacts["faiss_index"]
+        app_ref.state.title_lookup = artifacts["title_lookup"]
         app_ref.state.content_model = artifacts["content_model"]
         app_ref.state.hybrid_model = artifacts["hybrid_model"]
         app_ref.state.is_ready = True
 
-        logging.info("Artifacts loaded successfully and kept in memory")
+        logging.info("Startup initialization complete: backend ready")
     except Exception:
         app_ref.state.is_ready = False
         logging.exception("Artifact initialization failed")
@@ -79,9 +89,9 @@ async def _initialize_models(app_ref: FastAPI) -> None:
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    logging.info("Starting API and scheduling recommender initialization")
+    logging.info("Starting API and initializing recommender resources")
     app.state.is_ready = False
-    app.state.init_task = asyncio.create_task(_initialize_models(app))
+    await _initialize_models(app)
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:

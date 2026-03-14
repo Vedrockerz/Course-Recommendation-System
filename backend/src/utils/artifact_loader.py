@@ -17,6 +17,16 @@ ARTIFACT_URLS: Dict[str, str] = {
     "final_courses.csv": "https://huggingface.co/IneedBREAK/course-recommendation/resolve/main/final_courses.csv",
 }
 
+RUNTIME_REQUIRED_ARTIFACTS = (
+    "course_faiss.index",
+    "courses_dataframe.pkl",
+)
+
+OPTIONAL_ARTIFACTS = (
+    "embedding_matrix.pkl",
+    "final_courses.csv",
+)
+
 
 def _download_file(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -35,7 +45,7 @@ def _download_file(url: str, destination: Path) -> None:
     logging.info("Artifact ready: %s", destination)
 
 
-def ensure_startup_artifacts() -> None:
+def ensure_startup_artifacts(include_optional: bool = False) -> None:
     artifact_config = ArtifactConfig()
     data_config = DataConfig()
 
@@ -46,7 +56,15 @@ def ensure_startup_artifacts() -> None:
         "final_courses.csv": Path(data_config.final_data_path),
     }
 
+    selected_artifacts = set(RUNTIME_REQUIRED_ARTIFACTS)
+
+    if include_optional:
+        selected_artifacts.update(OPTIONAL_ARTIFACTS)
+
     for file_name, path in target_paths.items():
+        if file_name not in selected_artifacts:
+            continue
+
         path.parent.mkdir(parents=True, exist_ok=True)
 
         if path.exists():

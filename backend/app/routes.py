@@ -45,9 +45,11 @@ def _format_results(rows) -> List[Dict[str, Any]]:
     tags=["Health"],
 )
 def health_check(request: Request) -> Dict[str, str]:
-    if getattr(request.app.state, "is_ready", False):
-        return {"status": "ok"}
-    raise HTTPException(status_code=503, detail="AI recommendation engine is initializing")
+    is_ready = getattr(request.app.state, "is_ready", False)
+    return {
+        "status": "ok",
+        "ready": "true" if is_ready else "false",
+    }
 
 
 @router.get(
@@ -56,7 +58,7 @@ def health_check(request: Request) -> Dict[str, str]:
     tags=["Health"],
 )
 def root_status() -> Dict[str, str]:
-    return {"status": "running"}
+    return {"status": "running", "message": "AI Course Recommendation API is live"}
 
 
 def _ensure_engine_ready(request: Request) -> None:
@@ -212,9 +214,8 @@ def similar_courses(
         artifact_config = request.app.state.artifact_config
         content_model = request.app.state.content_model
         hybrid_model = request.app.state.hybrid_model
+        title_lookup = request.app.state.title_lookup
         df = request.app.state.df
-
-        title_lookup = {str(title).strip().lower(): str(title) for title in df["course_title"].astype(str).tolist()}
 
         normalized_input = course_name.strip().lower()
 

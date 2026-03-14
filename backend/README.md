@@ -104,7 +104,7 @@ data/artifacts/
 
 **2️⃣ Run FastAPI backend**
 ```bash
-uvicorn app.main:app --reload
+uvicorn main:app --reload
 ```
 
 **3️⃣ Run tests**
@@ -154,3 +154,23 @@ pytest
 Machine Learning & AI enthusiast building systems that help people learn better.
 
 ⭐ If you like this project, consider starring the repository.
+
+---
+
+## Render Deployment
+
+1. Use backend folder as the service root.
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+3. Start command:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 10000
+```
+4. Health check path:
+```bash
+/health
+```
+
+This repository also includes a `Procfile` with the same production start command.
