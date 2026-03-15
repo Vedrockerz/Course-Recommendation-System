@@ -5,6 +5,7 @@ sentence-transformers
 faiss-cpu
 fastapi
 uvicorn[standard]
+gunicorn
 huggingface-hub
 requests
 torch --index-url https://download.pytorch.org/whl/cpu

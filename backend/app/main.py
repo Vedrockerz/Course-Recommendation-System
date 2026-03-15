@@ -6,12 +6,18 @@ import numpy as np
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config import ArtifactConfig
 from src.utils.artifact_loader import ensure_startup_artifacts
 from src.utils.logger import logging
 
 from app.routes import router
+
+
+def _parse_csv_env(var_name: str, default: str) -> list[str]:
+    raw_value = os.getenv(var_name, default)
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
 app = FastAPI(
@@ -22,11 +28,27 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+cors_allow_origins = _parse_csv_env("CORS_ALLOW_ORIGINS", "*")
+cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+
+if "*" in cors_allow_origins and cors_allow_credentials:
+    logging.warning(
+        "CORS_ALLOW_CREDENTIALS=true is not valid with CORS_ALLOW_ORIGINS='*'. "
+        "Falling back to CORS_ALLOW_CREDENTIALS=false."
+    )
+    cors_allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=_parse_csv_env("ALLOWED_HOSTS", "*"),
 )
 
 

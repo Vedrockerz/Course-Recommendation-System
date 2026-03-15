@@ -183,3 +183,71 @@ uvicorn main:app --host 0.0.0.0 --port 10000
 ```
 
 This repository also includes a `Procfile` with the same production start command.
+
+## AWS EC2 Deployment (Backend)
+
+### 1) Launch and prepare Ubuntu instance
+```bash
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv python3-pip git nginx
+```
+
+### 2) Clone and install backend
+```bash
+cd /home/ubuntu
+git clone https://github.com/Vedrockerz/Course-Recommendation-System.git
+cd Course-Recommendation-System/backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 3) Create environment file
+Create `/etc/learnwise-backend.env`:
+```bash
+PORT=8000
+ALLOWED_HOSTS=your-domain.com,api.your-domain.com,localhost,127.0.0.1
+CORS_ALLOW_ORIGINS=https://your-frontend-domain.com,http://localhost:3000
+CORS_ALLOW_CREDENTIALS=false
+HF_HOME=/home/ubuntu/.cache/huggingface
+TOKENIZERS_PARALLELISM=false
+```
+
+### 4) Add systemd service (Gunicorn + Uvicorn worker)
+Copy `deploy/ec2/learnwise-backend.service` to `/etc/systemd/system/learnwise-backend.service` and update paths if needed.
+
+Then run:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable learnwise-backend
+sudo systemctl start learnwise-backend
+sudo systemctl status learnwise-backend
+```
+
+### 5) Configure Nginx reverse proxy
+Copy `deploy/ec2/learnwise-backend.nginx.conf` to `/etc/nginx/sites-available/learnwise-backend` and update `server_name`.
+
+Enable site:
+```bash
+sudo ln -s /etc/nginx/sites-available/learnwise-backend /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### 6) Open EC2 security group ports
+- `22` for SSH
+- `80` for HTTP
+- `443` for HTTPS (recommended)
+
+### 7) Optional HTTPS with Certbot
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d api.your-domain.com
+```
+
+### 8) Verify
+```bash
+curl http://127.0.0.1:8000/health
+curl https://api.your-domain.com/health
+```

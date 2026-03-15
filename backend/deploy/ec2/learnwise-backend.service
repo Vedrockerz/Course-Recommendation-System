@@ -1,0 +1,22 @@
+[Unit]
+Description=LearnWise FastAPI Backend
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/Course-Recommendation-System/backend
+EnvironmentFile=/etc/learnwise-backend.env
+ExecStart=/home/ubuntu/Course-Recommendation-System/backend/.venv/bin/gunicorn \
+  -k uvicorn.workers.UvicornWorker \
+  -w 2 \
+  -b 127.0.0.1:${PORT} \
+  --timeout 180 \
+  --graceful-timeout 30 \
+  --keep-alive 5 \
+  main:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
