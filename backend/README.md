@@ -164,11 +164,20 @@ Machine Learning & AI enthusiast building systems that help people learn better.
 ```bash
 pip install -r requirements.txt
 ```
-3. Start command:
+3. Recommended build command (preloads the same SentenceTransformer model during build):
+```bash
+pip install -r requirements.txt && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
+```
+4. Optional environment variables:
+```bash
+HF_HOME=/opt/render/project/.cache/huggingface
+TOKENIZERS_PARALLELISM=false
+```
+5. Start command:
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 10000
 ```
-4. Health check path:
+6. Health check path:
 ```bash
 /health
 ```

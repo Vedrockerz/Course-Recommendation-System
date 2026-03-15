@@ -1,5 +1,6 @@
 import sys
 import re
+import time
 import numpy as np
 import pandas as pd
 
@@ -16,7 +17,11 @@ class ContentRecommender:
 	def __init__(self, df, faiss_index, model_name):
 		self.df = df
 		self.faiss_index = faiss_index
+		load_start = time.perf_counter()
+		logging.info("Initializing SentenceTransformer model: %s", model_name)
 		self.model = SentenceTransformer(model_name)
+		load_seconds = time.perf_counter() - load_start
+		logging.info("SentenceTransformer model loaded in %.2f seconds", load_seconds)
 		self.course_titles = self.df["course_title"].astype(str).tolist()
 		self.course_to_idx = pd.Series(self.df.index, index=self.df["course_title"]).drop_duplicates()
 		self.sim_engine = SimilarityEngine()

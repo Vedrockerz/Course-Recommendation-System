@@ -46,9 +46,19 @@ def _format_results(rows) -> List[Dict[str, Any]]:
 )
 def health_check(request: Request) -> Dict[str, str]:
     is_ready = getattr(request.app.state, "is_ready", False)
+    init_task = getattr(request.app.state, "init_task", None)
+    init_error = getattr(request.app.state, "init_error", None)
+
+    if init_task is None:
+        init_task_state = "not_scheduled"
+    else:
+        init_task_state = "completed" if init_task.done() else "running"
+
     return {
         "status": "ok",
         "ready": "true" if is_ready else "false",
+        "init_task": init_task_state,
+        "init_error": str(init_error) if init_error else "",
     }
 
 
@@ -63,7 +73,12 @@ def root_status() -> Dict[str, str]:
 
 def _ensure_engine_ready(request: Request) -> None:
     if not getattr(request.app.state, "is_ready", False):
-        raise HTTPException(status_code=503, detail="AI recommendation engine is initializing")
+        init_error = getattr(request.app.state, "init_error", None)
+        detail = "AI recommendation engine is initializing"
+        if init_error:
+            detail = f"AI recommendation engine failed to initialize: {init_error}"
+
+        raise HTTPException(status_code=503, detail=detail)
 
 
 @router.get(

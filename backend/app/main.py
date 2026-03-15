@@ -1,6 +1,7 @@
 import pickle
 import faiss
 import asyncio
+import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,6 +70,9 @@ def _load_recommender_artifacts() -> dict:
 
 async def _initialize_models(app_ref: FastAPI) -> None:
     try:
+        app_ref.state.init_error = None
+
+        init_start = time.perf_counter()
         logging.info("Starting startup artifact availability check")
         await asyncio.to_thread(ensure_startup_artifacts)
 
@@ -83,9 +87,11 @@ async def _initialize_models(app_ref: FastAPI) -> None:
         app_ref.state.hybrid_model = artifacts["hybrid_model"]
         app_ref.state.is_ready = True
 
-        logging.info("Startup initialization complete: backend ready")
-    except Exception:
+        init_seconds = time.perf_counter() - init_start
+        logging.info("Startup initialization complete: backend ready in %.2f seconds", init_seconds)
+    except Exception as exc:
         app_ref.state.is_ready = False
+        app_ref.state.init_error = str(exc)
         logging.exception("Artifact initialization failed")
 
 
@@ -94,6 +100,7 @@ async def startup_event() -> None:
     logging.info("Server startup event triggered")
     logging.info("Scheduling background recommender warmup")
     app.state.is_ready = False
+    app.state.init_error = None
     app.state.init_task = asyncio.create_task(_initialize_models(app))
     logging.info("Startup event completed; waiting for warmup readiness")
 
