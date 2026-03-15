@@ -130,7 +130,7 @@ def recommend_courses(
     top_k: int = Query(5, ge=1, le=50, description="Number of recommendations"),
 ) -> RecommendationResponse:
     try:
-        logging.info("/recommend called")
+        logging.info("/recommend called: query='%s', top_k=%s", query, top_k)
         _ensure_engine_ready(request)
 
         artifact_config = request.app.state.artifact_config
@@ -138,6 +138,7 @@ def recommend_courses(
         hybrid_model = request.app.state.hybrid_model
 
         candidate_pool = max(artifact_config.faiss_candidate_pool, top_k * 10)
+        logging.info("Running recommendation pipeline with candidate_pool=%s", candidate_pool)
 
         raw_results = content_model.get_recommendations(query=query, candidate_pool=candidate_pool)
 
@@ -149,6 +150,7 @@ def recommend_courses(
         )
 
         payload = _format_results(final_df)
+        logging.info("Returning recommendations: count=%s", len(payload))
 
         return RecommendationResponse(
             query=query,
@@ -223,7 +225,7 @@ def similar_courses(
     top_k: int = Query(5, ge=1, le=50, description="Number of similar recommendations"),
 ) -> SimilarResponse:
     try:
-        logging.info("/similar called")
+        logging.info("/similar called: course_name='%s', top_k=%s", course_name, top_k)
         _ensure_engine_ready(request)
 
         artifact_config = request.app.state.artifact_config
@@ -252,6 +254,7 @@ def similar_courses(
             )
 
         candidate_pool = max(artifact_config.faiss_candidate_pool, top_k * 10)
+        logging.info("Running similar-course pipeline with candidate_pool=%s", candidate_pool)
 
         raw_results = content_model.recommend_by_course_name(
             course_name=resolved_course_name,
@@ -266,6 +269,7 @@ def similar_courses(
         )
 
         payload = _format_results(final_df)
+        logging.info("Returning similar-course recommendations: count=%s", len(payload))
 
         return SimilarResponse(
             course_name=resolved_course_name,
