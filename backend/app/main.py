@@ -28,8 +28,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-cors_allow_origins = _parse_csv_env("CORS_ALLOW_ORIGINS", "*")
-cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+cors_allow_origins = _parse_csv_env(
+    "CORS_ALLOW_ORIGINS",
+    "https://www.learn-wise.me,https://learn-wise.me,http://localhost:3000",
+)
+cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
 
 if "*" in cors_allow_origins and cors_allow_credentials:
     logging.warning(
