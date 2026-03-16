@@ -16,7 +16,7 @@ LearnWise is an AI-powered course recommendation platform that helps users disco
 
 ## 2. Live Demo
 
-- Frontend: [https://learn-wise.me](https://learn-wise.me)
+- Frontend: [https://www.learn-wise.me](https://www.learn-wise.me)
 - Backend API: [https://api.learn-wise.me](https://api.learn-wise.me)
 
 ## 3. Features
@@ -183,7 +183,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ### 1) Clone Repository
 
 ```bash
-git clone https://github.com/<your-username>/Course-Recommendation-System.git
+git clone https://github.com/Vedrockerz/Course-Recommendation-System.git
 cd Course-Recommendation-System
 ```
 
