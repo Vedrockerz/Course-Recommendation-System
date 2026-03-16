@@ -17,7 +17,7 @@ LearnWise is an AI-powered course recommendation platform that helps users disco
 ## 2. Live Demo
 
 - Frontend: [https://www.learn-wise.me](https://www.learn-wise.me)
-- Backend API: [http://api.learn-wise.me](http://api.learn-wise.me)
+- Backend API: [http://api.learn-wise.me](http://api.learn-wise.me:8000)
 
 ## 3. Features
 
