@@ -1,10 +1,22 @@
 from typing import List, Optional
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
-    status: str = Field(example="ok")
-    message: str = Field(example="AI Course Recommendation API is running")
+    status: str = Field(example="ok", description="Status of the API")
+    backend_ready: bool = Field(example=True, description="Whether recommendation engine is ready")
+    uptime: float = Field(example=3600.5, description="Uptime in seconds")
+    timestamp: datetime = Field(description="Server timestamp (ISO 8601)")
+    environment: str = Field(example="production", description="Deployment environment")
+    version: str = Field(example="1.0.0", description="API version")
+
+
+class ErrorResponse(BaseModel):
+    error: bool = Field(example=True, description="Error flag")
+    message: str = Field(description="Human-readable error message")
+    code: str = Field(example="BACKEND_TIMEOUT", description="Error code for programmatic handling")
+    timestamp: datetime = Field(description="When the error occurred")
 
 
 class RecommendationItem(BaseModel):

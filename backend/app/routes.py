@@ -1,11 +1,14 @@
 from difflib import get_close_matches
 from typing import Dict, Any, List
+from time import time
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from src.utils.logger import logging
 
 from app.schemas import (
+    HealthResponse,
     RecommendationResponse,
     SimilarResponse,
 )
@@ -41,25 +44,24 @@ def _format_results(rows) -> List[Dict[str, Any]]:
 
 @router.get(
     "/health",
-    summary="Readiness health check",
+    response_model=HealthResponse,
+    summary="Backend health and readiness check",
     tags=["Health"],
 )
-def health_check(request: Request) -> Dict[str, str]:
+def health_check(request: Request) -> HealthResponse:
+    startup_time = getattr(request.app.state, "startup_time", time())
+    environment = getattr(request.app.state, "environment", "unknown")
     is_ready = getattr(request.app.state, "is_ready", False)
-    init_task = getattr(request.app.state, "init_task", None)
-    init_error = getattr(request.app.state, "init_error", None)
-
-    if init_task is None:
-        init_task_state = "not_scheduled"
-    else:
-        init_task_state = "completed" if init_task.done() else "running"
-
-    return {
-        "status": "ok",
-        "ready": "true" if is_ready else "false",
-        "init_task": init_task_state,
-        "init_error": str(init_error) if init_error else "",
-    }
+    uptime = time() - startup_time
+    
+    return HealthResponse(
+        status="ok",
+        backend_ready=is_ready,
+        uptime=uptime,
+        timestamp=datetime.utcnow(),
+        environment=environment,
+        version="1.0.0",
+    )
 
 
 @router.get(
@@ -74,10 +76,10 @@ def root_status() -> Dict[str, str]:
 def _ensure_engine_ready(request: Request) -> None:
     if not getattr(request.app.state, "is_ready", False):
         init_error = getattr(request.app.state, "init_error", None)
-        detail = "AI recommendation engine is initializing"
         if init_error:
-            detail = f"AI recommendation engine failed to initialize: {init_error}"
-
+            detail = f"Recommendation engine initialization failed: {init_error}"
+        else:
+            detail = "Recommendation engine is initializing. Please try again in a few seconds."
         raise HTTPException(status_code=503, detail=detail)
 
 
@@ -161,9 +163,15 @@ def recommend_courses(
 
     except HTTPException:
         raise
+    except ValueError as exc:
+        logging.warning("Invalid parameter in /recommend: %s", str(exc))
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(exc)}") from exc
+    except TimeoutError as exc:
+        logging.error("Timeout occurred during recommendation: %s", str(exc))
+        raise HTTPException(status_code=504, detail="Recommendation service timed out. Please try again.") from exc
     except Exception as exc:
         logging.exception("Error in /recommend")
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(exc)}") from exc
+        raise HTTPException(status_code=500, detail="Failed to generate recommendations. Please try again later.") from exc
 
 
 @router.get(
@@ -280,6 +288,12 @@ def similar_courses(
 
     except HTTPException:
         raise
+    except ValueError as exc:
+        logging.warning("Invalid parameter in /similar: %s", str(exc))
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(exc)}") from exc
+    except TimeoutError as exc:
+        logging.error("Timeout occurred during similar-course lookup: %s", str(exc))
+        raise HTTPException(status_code=504, detail="Service timed out. Please try again.") from exc
     except Exception as exc:
         logging.exception("Error in /similar")
-        raise HTTPException(status_code=500, detail=f"Failed to generate similar courses: {str(exc)}") from exc
+        raise HTTPException(status_code=500, detail="Failed to find similar courses. Please try again later.") from exc

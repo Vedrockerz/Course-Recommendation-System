@@ -9,10 +9,10 @@ import AIExplanation from "@/components/AIExplanation";
 import {
   Course, Filters, SortOption,
   checkBackendHealth, fetchRecommendations, fetchSimilarCourses, sortCourses,
+  ApiError, TimeoutError, NetworkError, ServiceUnavailableError,
+  HealthStatus,
 } from "@/services/api";
-
-const HEALTH_CHECK_INTERVAL_MS = 1000;
-const MAX_HEALTH_RETRIES = 30;
+import config from "@/services/config";
 
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -34,8 +34,32 @@ export default function HomePage() {
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
   const [backendRetryCount, setBackendRetryCount] = useState(0);
   const [backendConnectionError, setBackendConnectionError] = useState<string | null>(null);
+  const [backendWarmingUp, setBackendWarmingUp] = useState(false);
 
   const similarRef = useRef<HTMLDivElement>(null);
+
+  // Helper to convert API errors to user-friendly messages
+  const getErrorMessage = (err: unknown): string => {
+    if (err instanceof TimeoutError) {
+      return "Request timed out. The service may be busy. Please try again.";
+    }
+    if (err instanceof NetworkError) {
+      return "Network error. Please check your connection and try again.";
+    }
+    if (err instanceof ServiceUnavailableError) {
+      return "Recommendation engine is warming up. Please wait a moment and try again.";
+    }
+    if (err instanceof ApiError) {
+      if (err.code === "INVALID_RESPONSE") {
+        return "Server returned an unexpected response. Please try again.";
+      }
+      return err.message || "An error occurred. Please try again.";
+    }
+    if (err instanceof Error) {
+      return err.message || "An error occurred. Please try again.";
+    }
+    return "An unexpected error occurred. Please try again.";
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -53,28 +77,45 @@ export default function HomePage() {
     const checkBackendUntilReady = async () => {
       setIsCheckingBackend(true);
       setBackendConnectionError(null);
+      setBackendWarmingUp(false);
 
       let attempt = 0;
       while (!cancelled) {
         attempt += 1;
-        const healthy = await checkBackendHealth();
+        const healthStatus = await checkBackendHealth();
         if (cancelled) return;
 
-        if (healthy) {
-          setIsBackendReady(true);
+        if (healthStatus) {
+          // Backend is reachable. Check if recommendation engine is actually ready
+          if (healthStatus.backend_ready) {
+            setIsBackendReady(true);
+            setIsCheckingBackend(false);
+            setBackendRetryCount(attempt - 1);
+            setBackendConnectionError(null);
+            setBackendWarmingUp(false);
+            return;
+          }
+
+          // Backend is reachable but warming up
+          setBackendWarmingUp(true);
+          setIsBackendReady(false);
+          setBackendRetryCount(attempt);
+        } else {
+          // Cannot reach backend at all
+          setBackendWarmingUp(false);
+          setIsBackendReady(false);
+          setBackendRetryCount(attempt);
+        }
+
+        if (attempt >= config.maxHealthRetries) {
+          setBackendConnectionError(
+            "Unable to connect to the recommendation service. Please check if the backend is running."
+          );
           setIsCheckingBackend(false);
-          setBackendRetryCount(attempt - 1);
-          setBackendConnectionError(null);
           return;
         }
 
-        setBackendRetryCount(attempt);
-
-        if (attempt >= MAX_HEALTH_RETRIES) {
-          setBackendConnectionError("Unable to connect to AI recommendation service.");
-        }
-
-        await wait(HEALTH_CHECK_INTERVAL_MS);
+        await wait(config.healthCheckInterval);
       }
     };
 
@@ -104,7 +145,13 @@ export default function HomePage() {
 
   const handleSearch = async (query: string, filters: Filters, topK: number, sort: SortOption) => {
     if (!isBackendReady) {
-      setError("Initializing AI Recommendation Engine...");
+      if (isCheckingBackend) {
+        setError("Initializing AI Recommendation Engine. Please wait...");
+      } else if (backendWarmingUp) {
+        setError("Recommendation engine is warming up. Please wait a moment and try again.");
+      } else {
+        setError("Backend is not available. Please try again later.");
+      }
       return;
     }
 
@@ -125,8 +172,11 @@ export default function HomePage() {
       const elapsed = Math.round(performance.now() - start);
       setResponseTime(elapsed);
       setCourses(applyClientFilters(data.results, filters, sort));
-    } catch {
-      setError("Failed to fetch recommendations. Make sure the backend is running.");
+      if (data.count === 0) {
+        setError("No courses found for your query. Try different keywords.");
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
       setCourses([]);
     } finally {
       setIsLoading(false);
@@ -135,7 +185,13 @@ export default function HomePage() {
 
   const handleFindSimilar = async (courseName: string) => {
     if (!isBackendReady) {
-      setError("Initializing AI Recommendation Engine...");
+      if (isCheckingBackend) {
+        setError("Initializing AI Recommendation Engine. Please wait...");
+      } else if (backendWarmingUp) {
+        setError("Recommendation engine is warming up. Please wait a moment and try again.");
+      } else {
+        setError("Backend is not available. Please try again later.");
+      }
       return;
     }
 
@@ -151,8 +207,11 @@ export default function HomePage() {
     try {
       const data = await fetchSimilarCourses(courseName, lastFilters, lastTopK);
       setSimilarCourses(applyClientFilters(data.results, lastFilters, lastSort));
-    } catch {
-      setError("Failed to fetch similar courses. Please try again.");
+      if (data.count === 0) {
+        setError("No similar courses found. The course might not be available.");
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
       setSimilarCourses([]);
     } finally {
       setIsSimilarLoading(false);
@@ -224,10 +283,16 @@ export default function HomePage() {
                           bg-white/80 dark:bg-gray-900/70 backdrop-blur-xl px-4 py-3.5 shadow-sm">
             <div className="flex items-center gap-3 text-indigo-700 dark:text-indigo-300">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <div className="text-sm sm:text-base font-medium">Initializing AI Recommendation Engine...</div>
+              <div className="text-sm sm:text-base font-medium">
+                {backendWarmingUp
+                  ? "Recommendation engine is warming up..."
+                  : "Initializing AI Recommendation Engine..."}
+              </div>
             </div>
             <p className="mt-1 text-xs text-indigo-600/80 dark:text-indigo-300/80">
-              Waiting for backend readiness. Retry attempt: {backendRetryCount}
+              {backendWarmingUp
+                ? "Loading models and indexes. Please wait a few seconds..."
+                : "Waiting for backend to respond. Attempt: " + backendRetryCount}
             </p>
           </div>
         )}
@@ -236,6 +301,9 @@ export default function HomePage() {
           <div className="max-w-3xl mx-auto mb-4 rounded-2xl border border-red-200 dark:border-red-800/50
                           bg-red-50/80 dark:bg-red-900/20 px-4 py-3.5">
             <p className="text-sm text-red-700 dark:text-red-300 font-medium">{backendConnectionError}</p>
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+              The backend may be starting up. Please wait a moment and refresh the page.
+            </p>
           </div>
         )}
 

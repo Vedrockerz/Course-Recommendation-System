@@ -41,17 +41,173 @@ export type SortOption =
   | "shortest"
   | "longest";
 
-export async function checkBackendHealth(): Promise<boolean> {
-  try {
-    const res = await fetch(`${config.apiBaseUrl}/health`, { cache: "no-store" });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data?.status === "ok";
-  } catch {
-    return false;
+export interface HealthStatus {
+  status: string;
+  backend_ready: boolean;
+  uptime: number;
+  timestamp: string;
+  environment: string;
+  version: string;
+}
+
+// Error types for better programmatic handling
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    public statusCode: number,
+    public message: string
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
 }
 
+export class TimeoutError extends ApiError {
+  constructor() {
+    super("TIMEOUT", 408, "Request timed out. Please try again.");
+    this.name = "TimeoutError";
+  }
+}
+
+export class NetworkError extends ApiError {
+  constructor() {
+    super("NETWORK_ERROR", 0, "Unable to connect to the server. Please check your connection.");
+    this.name = "NetworkError";
+  }
+}
+
+export class ServiceUnavailableError extends ApiError {
+  constructor(message?: string) {
+    super(
+      "SERVICE_UNAVAILABLE",
+      503,
+      message || "Service is temporarily unavailable. Please try again in a few seconds."
+    );
+    this.name = "ServiceUnavailableError";
+  }
+}
+
+// Generic fetch with timeout, retry, and error handling
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  retryCount = 0
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    config.apiTimeout
+  );
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    clearTimeout(timeoutId);
+
+    // Retry logic for transient failures
+    if (!response.ok) {
+      // 503 Service Unavailable - backend initializing
+      if (response.status === 503) {
+        if (retryCount < config.maxRetries) {
+          const delay = config.retryDelayMs * Math.pow(2, retryCount);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return fetchWithRetry(url, options, retryCount + 1);
+        }
+        throw new ServiceUnavailableError();
+      }
+
+      // 504 Gateway Timeout - service timeout
+      if (response.status === 504) {
+        if (retryCount < config.maxRetries) {
+          const delay = config.retryDelayMs * Math.pow(2, retryCount);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return fetchWithRetry(url, options, retryCount + 1);
+        }
+        throw new TimeoutError();
+      }
+
+      // Other client errors
+      if (response.status >= 400 && response.status < 500) {
+        const text = await response.text();
+        const detail = tryParseErrorDetail(text) || response.statusText;
+        throw new ApiError(
+          `HTTP_${response.status}`,
+          response.status,
+          detail
+        );
+      }
+
+      // Server errors - retry with backoff
+      if (response.status >= 500) {
+        if (retryCount < config.maxRetries) {
+          const delay = config.retryDelayMs * Math.pow(2, retryCount);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return fetchWithRetry(url, options, retryCount + 1);
+        }
+        throw new ApiError(
+          `HTTP_${response.status}`,
+          response.status,
+          "Server error. Please try again later."
+        );
+      }
+    }
+
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+
+    if (err instanceof ApiError) {
+      throw err;
+    }
+
+    // Network error or abort
+    if (
+      err instanceof TypeError ||
+      (err instanceof Error && err.name === "AbortError")
+    ) {
+      if (err.name === "AbortError") {
+        throw new TimeoutError();
+      }
+      throw new NetworkError();
+    }
+
+    throw err;
+  }
+}
+
+// Helper to extract error details from response
+function tryParseErrorDetail(text: string): string | null {
+  try {
+    const json = JSON.parse(text);
+    return json.detail || json.message || null;
+  } catch {
+    return null;
+  }
+}
+
+// Health check with simpler retry (no exponential backoff needed)
+export async function checkBackendHealth(): Promise<HealthStatus | null> {
+  try {
+    const response = await fetch(`${config.apiBaseUrl}/health`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data as HealthStatus;
+  } catch {
+    return null;
+  }
+}
+
+// Fetch recommendations with retry
 export async function fetchRecommendations(
   query: string,
   filters: Filters = {},
@@ -59,31 +215,72 @@ export async function fetchRecommendations(
 ): Promise<RecommendResponse> {
   const params = new URLSearchParams({ query, top_k: String(topK) });
   if (filters.level) params.set("level", filters.level);
-  if (filters.duration_category) params.set("duration_category", filters.duration_category);
+  if (filters.duration_category)
+    params.set("duration_category", filters.duration_category);
 
-  const res = await fetch(`${config.apiBaseUrl}/recommend?${params}`);
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+  const response = await fetchWithRetry(
+    `${config.apiBaseUrl}/recommend?${params}`
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      `HTTP_${response.status}`,
+      response.status,
+      "Failed to fetch recommendations"
+    );
   }
-  return res.json();
+
+  const data = await response.json();
+  if (!data || !Array.isArray(data.results)) {
+    throw new ApiError(
+      "INVALID_RESPONSE",
+      500,
+      "Server returned malformed response"
+    );
+  }
+
+  return data as RecommendResponse;
 }
 
+// Fetch similar courses with retry
 export async function fetchSimilarCourses(
   courseName: string,
   filters: Filters = {},
   topK: number = 10
 ): Promise<SimilarResponse> {
-  const params = new URLSearchParams({ course_name: courseName, top_k: String(topK) });
+  const params = new URLSearchParams({
+    course_name: courseName,
+    top_k: String(topK),
+  });
   if (filters.level) params.set("level", filters.level);
-  if (filters.duration_category) params.set("duration_category", filters.duration_category);
+  if (filters.duration_category)
+    params.set("duration_category", filters.duration_category);
 
-  const res = await fetch(`${config.apiBaseUrl}/similar?${params}`);
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+  const response = await fetchWithRetry(
+    `${config.apiBaseUrl}/similar?${params}`
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      `HTTP_${response.status}`,
+      response.status,
+      "Failed to fetch similar courses"
+    );
   }
-  return res.json();
+
+  const data = await response.json();
+  if (!data || !Array.isArray(data.results)) {
+    throw new ApiError(
+      "INVALID_RESPONSE",
+      500,
+      "Server returned malformed response"
+    );
+  }
+
+  return data as SimilarResponse;
 }
 
+// Utility to sort courses
 export function sortCourses(courses: Course[], sort: SortOption): Course[] {
   const sorted = [...courses];
   switch (sort) {

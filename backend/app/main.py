@@ -3,6 +3,8 @@ import faiss
 import asyncio
 import os
 import numpy as np
+from time import time
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -114,6 +116,8 @@ def _load_recommender_artifacts() -> dict:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    app.state.startup_time = time()
+    app.state.environment = os.getenv("ENVIRONMENT", "development")
     app.state.is_ready = False
     app.state.init_error = None
     app.state.init_task = None
