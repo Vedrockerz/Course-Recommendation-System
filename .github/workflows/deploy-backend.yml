@@ -18,8 +18,12 @@ jobs:
           port: ${{ secrets.EC2_PORT }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+            export NVM_DIR="/home/ubuntu/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            export PATH="${{ secrets.EC2_APP_PATH }}/venv/bin:$PATH"
             cd ${{ secrets.EC2_APP_PATH }}
             git fetch origin
             git reset --hard origin/main
-            export PATH="/home/ubuntu/Course-Recommendation-System/backend/venv/bin:/home/ubuntu/.nvm/versions/node/v24.13.0/bin:$PATH"
-            /home/ubuntu/.nvm/versions/node/v24.13.0/bin/pm2 restart ${{ secrets.PM2_APP_NAME }}
+            which pm2
+            pm2 restart ${{ secrets.PM2_APP_NAME }}
