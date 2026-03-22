@@ -103,6 +103,12 @@ data/artifacts/
 ```
 
 **2️⃣ Run FastAPI backend**
+Create a local environment file first:
+```bash
+cp .env.example .env
+```
+Set `YOUTUBE_API_KEY` in `.env` if you want live YouTube resources.
+
 ```bash
 uvicorn main:app --reload
 ```
@@ -172,6 +178,9 @@ pip install -r requirements.txt && python -c "from sentence_transformers import 
 ```bash
 HF_HOME=/opt/render/project/.cache/huggingface
 TOKENIZERS_PARALLELISM=false
+YOUTUBE_API_KEY=your_youtube_api_key_here
+YOUTUBE_MAX_RESULTS=6
+YOUTUBE_TIMEOUT_SECONDS=8
 ```
 5. Start command:
 ```bash

@@ -47,5 +47,23 @@ class SimilarResponse(BaseModel):
     results: List[RecommendationItem]
 
 
+class YouTubeItem(BaseModel):
+    title: str
+    description: Optional[str] = None
+    thumbnail: Optional[str] = None
+    channel_title: Optional[str] = None
+    published_date: Optional[datetime] = None
+    video_url: Optional[str] = None
+    type: str = Field(example="video")
+    source: str = Field(example="youtube")
+
+
+class YouTubeResponse(BaseModel):
+    query: str
+    top_k: int
+    count: int
+    results: List[YouTubeItem]
+
+
 class ErrorResponse(BaseModel):
     detail: str

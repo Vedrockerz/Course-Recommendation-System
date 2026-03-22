@@ -6,9 +6,10 @@ import SearchBar from "@/components/SearchBar";
 import CourseGrid from "@/components/CourseGrid";
 import CourseDetailModal from "@/components/CourseDetailModal";
 import AIExplanation from "@/components/AIExplanation";
+import YouTubeResources from "@/components/YouTubeResources";
 import {
-  Course, Filters, SortOption,
-  checkBackendHealth, fetchRecommendations, fetchSimilarCourses, sortCourses,
+  Course, Filters, SortOption, YouTubeResource,
+  checkBackendHealth, fetchRecommendations, fetchSimilarCourses, fetchYouTubeResources, sortCourses,
   ApiError, TimeoutError, NetworkError, ServiceUnavailableError,
   HealthStatus,
 } from "@/services/api";
@@ -19,8 +20,11 @@ export default function HomePage() {
   const [similarCourses, setSimilarCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSimilarLoading, setIsSimilarLoading] = useState(false);
+  const [isYouTubeLoading, setIsYouTubeLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [hasSimilarSearched, setHasSimilarSearched] = useState(false);
+  const [youtubeResources, setYoutubeResources] = useState<YouTubeResource[]>([]);
+  const [youtubeWarning, setYoutubeWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [similarHeading, setSimilarHeading] = useState("");
   const [dark, setDark] = useState(false);
@@ -165,21 +169,41 @@ export default function HomePage() {
     setLastSort(sort);
     setLastQuery(query);
     setResponseTime(null);
+    setYoutubeResources([]);
+    setYoutubeWarning(null);
+    setIsYouTubeLoading(true);
 
     const start = performance.now();
     try {
-      const data = await fetchRecommendations(query, filters, topK);
-      const elapsed = Math.round(performance.now() - start);
-      setResponseTime(elapsed);
-      setCourses(applyClientFilters(data.results, filters, sort));
-      if (data.count === 0) {
-        setError("No courses found for your query. Try different keywords.");
+      const recommendationPromise = fetchRecommendations(query, filters, topK);
+      const youtubePromise = fetchYouTubeResources(query, Math.min(topK, 6));
+      const [recommendationResult, youtubeResult] = await Promise.allSettled([
+        recommendationPromise,
+        youtubePromise,
+      ]);
+
+      if (recommendationResult.status === "fulfilled") {
+        const data = recommendationResult.value;
+        const elapsed = Math.round(performance.now() - start);
+        setResponseTime(elapsed);
+        setCourses(applyClientFilters(data.results, filters, sort));
+        if (data.count === 0) {
+          setError("No courses found for your query. Try different keywords.");
+        }
+      } else {
+        setError(getErrorMessage(recommendationResult.reason));
+        setCourses([]);
       }
-    } catch (err) {
-      setError(getErrorMessage(err));
-      setCourses([]);
+
+      if (youtubeResult.status === "fulfilled") {
+        setYoutubeResources(youtubeResult.value.results);
+      } else {
+        setYoutubeResources([]);
+        setYoutubeWarning("Live YouTube resources are temporarily unavailable.");
+      }
     } finally {
       setIsLoading(false);
+      setIsYouTubeLoading(false);
     }
   };
 
@@ -342,6 +366,13 @@ export default function HomePage() {
         {hasSearched && !isLoading && courses.length > 0 && (
           <AIExplanation query={lastQuery} courses={courses} responseTime={responseTime} />
         )}
+
+        <YouTubeResources
+          resources={youtubeResources}
+          isLoading={isYouTubeLoading}
+          hasSearched={hasSearched}
+          warning={youtubeWarning}
+        />
 
         <div ref={similarRef}>
           <CourseGrid

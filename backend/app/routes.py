@@ -11,6 +11,7 @@ from app.schemas import (
     HealthResponse,
     RecommendationResponse,
     SimilarResponse,
+    YouTubeResponse,
 )
 
 
@@ -297,3 +298,34 @@ def similar_courses(
     except Exception as exc:
         logging.exception("Error in /similar")
         raise HTTPException(status_code=500, detail="Failed to find similar courses. Please try again later.") from exc
+
+
+@router.get(
+    "/youtube",
+    response_model=YouTubeResponse,
+    summary="Get related YouTube learning resources",
+    tags=["External Resources"],
+)
+def youtube_resources(
+    request: Request,
+    query: str = Query(..., min_length=2, description="Search topic for YouTube tutorials"),
+    top_k: int = Query(6, ge=1, le=15, description="Number of YouTube resources"),
+) -> YouTubeResponse:
+    try:
+        youtube_service = getattr(request.app.state, "youtube_service", None)
+        if youtube_service is None:
+            logging.warning("YouTube service unavailable on app state")
+            return YouTubeResponse(query=query, top_k=top_k, count=0, results=[])
+
+        payload = youtube_service.fetch_learning_resources(query=query, top_k=top_k)
+        logging.info("Returning YouTube resources: query='%s', count=%s", query, len(payload))
+
+        return YouTubeResponse(
+            query=query,
+            top_k=top_k,
+            count=len(payload),
+            results=payload,
+        )
+    except Exception:
+        logging.exception("Error in /youtube")
+        return YouTubeResponse(query=query, top_k=top_k, count=0, results=[])

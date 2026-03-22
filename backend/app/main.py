@@ -5,16 +5,23 @@ import os
 import numpy as np
 from time import time
 from datetime import datetime
+from dotenv import load_dotenv
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config import ArtifactConfig
+from src.services.youtube_service import YouTubeService
 from src.utils.artifact_loader import ensure_startup_artifacts
 from src.utils.logger import logging
 
 from app.routes import router
+
+
+# Load local development environment variables from backend/.env if present.
+# Existing process-level environment variables keep precedence.
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), override=False)
 
 
 def _parse_csv_env(var_name: str, default: str) -> list[str]:
@@ -121,6 +128,7 @@ async def startup_event() -> None:
     app.state.is_ready = False
     app.state.init_error = None
     app.state.init_task = None
+    app.state.youtube_service = YouTubeService()
 
     try:
         logging.info("Server startup event triggered")

@@ -28,6 +28,24 @@ export interface SimilarResponse {
   results: Course[];
 }
 
+export interface YouTubeResource {
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  channel_title?: string;
+  published_date?: string;
+  video_url?: string;
+  type: "video" | "playlist";
+  source: "youtube";
+}
+
+export interface YouTubeResponse {
+  query: string;
+  top_k: number;
+  count: number;
+  results: YouTubeResource[];
+}
+
 export interface Filters {
   level?: string;
   duration_category?: string;
@@ -278,6 +296,36 @@ export async function fetchSimilarCourses(
   }
 
   return data as SimilarResponse;
+}
+
+export async function fetchYouTubeResources(
+  query: string,
+  topK: number = 6
+): Promise<YouTubeResponse> {
+  const params = new URLSearchParams({ query, top_k: String(topK) });
+
+  const response = await fetchWithRetry(
+    `${config.apiBaseUrl}/youtube?${params}`
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      `HTTP_${response.status}`,
+      response.status,
+      "Failed to fetch YouTube resources"
+    );
+  }
+
+  const data = await response.json();
+  if (!data || !Array.isArray(data.results)) {
+    throw new ApiError(
+      "INVALID_RESPONSE",
+      500,
+      "Server returned malformed YouTube response"
+    );
+  }
+
+  return data as YouTubeResponse;
 }
 
 // Utility to sort courses
