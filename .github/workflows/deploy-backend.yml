@@ -26,11 +26,11 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             # Update YouTube API key in systemd environment file
-            echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" | sudo tee /tmp/youtube_env > /dev/null
+            echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" > /tmp/youtube_env
             if sudo grep -q "^YOUTUBE_API_KEY=" /etc/learnwise-backend.env 2>/dev/null; then
               sudo sed -i '/^YOUTUBE_API_KEY=/d' /etc/learnwise-backend.env
             fi
-            sudo cat /tmp/youtube_env >> /etc/learnwise-backend.env
+            cat /tmp/youtube_env | sudo tee -a /etc/learnwise-backend.env > /dev/null
             rm /tmp/youtube_env
             # Restart systemd service to load updated environment
             sudo systemctl restart learnwise-backend
