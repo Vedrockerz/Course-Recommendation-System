@@ -21,4 +21,4 @@ jobs:
             cd ${{ secrets.EC2_APP_PATH }}
             git fetch origin
             git reset --hard origin/main
-            pm2 restart ${{ secrets.PM2_APP_NAME }}
+            /home/ubuntu/.nvm/versions/node/v24.13.0/bin/pm2 restart ${{ secrets.PM2_APP_NAME }}
