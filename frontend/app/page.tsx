@@ -14,8 +14,6 @@ import {
 } from "@/services/api";
 import config from "@/services/config";
 
-const DEPLOY_MARKER = "GA-DEPLOY-2026-03-22-A";
-
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [similarCourses, setSimilarCourses] = useState<Course[]>([]);
@@ -270,18 +268,6 @@ export default function HomePage() {
             Powered by AI to recommend the best courses from Udemy, Coursera, and
             more. Just type what you want to learn.
           </p>
-
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2
-                          bg-amber-100/90 dark:bg-amber-900/30
-                          border border-amber-300/90 dark:border-amber-700/70
-                          text-amber-900 dark:text-amber-200
-                          shadow-md shadow-amber-200/70 dark:shadow-none
-                          animate-pulse">
-            <Zap className="h-4 w-4" />
-            <span className="text-xs sm:text-sm font-extrabold tracking-wide">
-              Deployment Marker: {DEPLOY_MARKER}
-            </span>
-          </div>
 
           {isBackendReady && (
             <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5
