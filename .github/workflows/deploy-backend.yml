@@ -25,5 +25,7 @@ jobs:
             cd ${{ secrets.EC2_APP_PATH }}
             git fetch origin
             git reset --hard origin/main
+            # Restart backend with YouTube API key injected via environment
+            export YOUTUBE_API_KEY="${{ secrets.YOUTUBE_API_KEY }}"
             which pm2
-            /home/ubuntu/.nvm/versions/node/v24.13.0/bin/pm2 restart ${{ secrets.PM2_APP_NAME }}
+            /home/ubuntu/.nvm/versions/node/v24.13.0/bin/pm2 restart ${{ secrets.PM2_APP_NAME }} --update-env
