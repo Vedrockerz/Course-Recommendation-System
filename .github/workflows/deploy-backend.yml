@@ -25,7 +25,12 @@ jobs:
             cd ${{ secrets.EC2_APP_PATH }}
             git fetch origin
             git reset --hard origin/main
-            # Restart backend with YouTube API key injected via environment
-            export YOUTUBE_API_KEY="${{ secrets.YOUTUBE_API_KEY }}"
-            which pm2
-            /home/ubuntu/.nvm/versions/node/v24.13.0/bin/pm2 restart ${{ secrets.PM2_APP_NAME }} --update-env
+            # Update YouTube API key in systemd environment file
+            echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" | sudo tee /tmp/youtube_env > /dev/null
+            if sudo grep -q "^YOUTUBE_API_KEY=" /etc/learnwise-backend.env 2>/dev/null; then
+              sudo sed -i '/^YOUTUBE_API_KEY=/d' /etc/learnwise-backend.env
+            fi
+            sudo cat /tmp/youtube_env >> /etc/learnwise-backend.env
+            rm /tmp/youtube_env
+            # Restart systemd service to load updated environment
+            sudo systemctl restart learnwise-backend
