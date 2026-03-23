@@ -11,6 +11,9 @@ interface YouTubeResourcesProps {
   warning?: string | null;
   requestedCount?: number;
   sourceCount?: number;
+  heading?: string;
+  description?: string;
+  statusMessage?: string;
 }
 
 function formatPublishedDate(rawDate?: string): string {
@@ -70,6 +73,9 @@ export default function YouTubeResources({
   warning,
   requestedCount,
   sourceCount,
+  heading = "Best YouTube Videos",
+  description = "Supplementary resources to deepen concepts from your top course matches.",
+  statusMessage,
 }: YouTubeResourcesProps) {
   if (!hasSearched) return null;
   if (isLoading) return <YouTubeSkeleton />;
@@ -83,11 +89,15 @@ export default function YouTubeResources({
               <Youtube className="h-3.5 w-3.5" />
               Live YouTube Source
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Best YouTube Videos</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Supplementary resources to deepen concepts from your top course matches.
-            </p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{heading}</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{description}</p>
             <CountNote requestedCount={requestedCount} sourceCount={sourceCount} shownCount={resources.length} />
+            {statusMessage ? (
+              <p className="mt-2 inline-flex items-start gap-1.5 rounded-xl border border-slate-300/70 bg-slate-100/70 px-2.5 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {statusMessage}
+              </p>
+            ) : null}
           </div>
 
           <div className="shrink-0 text-left sm:text-right">

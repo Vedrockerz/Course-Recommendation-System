@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   BookOpen,
   Sun,
@@ -19,6 +19,7 @@ import CourseGrid from "../components/CourseGrid";
 import CourseDetailModal from "../components/CourseDetailModal";
 import AIExplanation from "../components/AIExplanation";
 import YouTubeResources from "../components/YouTubeResources";
+import ResultsOverview from "../components/ResultsOverview";
 import {
   Course,
   Filters,
@@ -37,6 +38,87 @@ import {
 import config from "@/services/config";
 
 const YOUTUBE_RESULT_CAP = 8;
+
+type Confidence = "high" | "medium" | "low";
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenizeQuery(query: string): string[] {
+  const normalized = normalizeText(query);
+  const tokens = normalized.split(" ").filter((token) => token.length >= 2);
+  return Array.from(new Set(tokens));
+}
+
+function keywordCoverage(tokens: string[], text: string): number {
+  if (tokens.length === 0) return 0;
+  const normalizedText = normalizeText(text);
+  if (!normalizedText) return 0;
+
+  const matched = tokens.filter((token) => normalizedText.includes(token)).length;
+  return clamp01(matched / tokens.length);
+}
+
+function aggregateTopScores(scores: number[]): number {
+  if (scores.length === 0) return 0;
+  const sorted = [...scores].sort((a, b) => b - a).slice(0, 4);
+  const weights = [1, 0.78, 0.62, 0.5];
+  const weighted = sorted.reduce((sum, score, index) => sum + score * weights[index], 0);
+  const totalWeight = weights.slice(0, sorted.length).reduce((sum, weight) => sum + weight, 0);
+  return totalWeight > 0 ? clamp01(weighted / totalWeight) : 0;
+}
+
+function estimateCourseQuality(courses: Course[], query: string): number {
+  if (courses.length === 0) return 0;
+  const tokens = tokenizeQuery(query);
+
+  const perItemScores = courses.slice(0, 8).map((course) => {
+    const relevanceText = `${course.course_title || ""} ${course.metadata || ""}`;
+    const lexical = keywordCoverage(tokens, relevanceText);
+    const simScore = typeof course.similarity_score === "number" ? clamp01(course.similarity_score) : lexical * 0.55;
+    const ratingScore = clamp01((course.rating ?? 0) / 5);
+    const popularityScore = clamp01(Math.log10((course.reviewcount ?? 0) + 1) / 6);
+
+    return clamp01(simScore * 0.58 + lexical * 0.27 + ratingScore * 0.1 + popularityScore * 0.05);
+  });
+
+  return aggregateTopScores(perItemScores);
+}
+
+function estimateYouTubeQuality(resources: YouTubeResource[], query: string): number {
+  if (resources.length === 0) return 0;
+  const tokens = tokenizeQuery(query);
+
+  const perItemScores = resources.slice(0, 8).map((resource) => {
+    const relevanceText = `${resource.title || ""} ${resource.description || ""} ${resource.channel_title || ""}`;
+    const lexical = keywordCoverage(tokens, relevanceText);
+
+    let freshness = 0.55;
+    if (resource.published_date) {
+      const ts = new Date(resource.published_date).getTime();
+      if (!Number.isNaN(ts)) {
+        const yearsOld = (Date.now() - ts) / (1000 * 60 * 60 * 24 * 365);
+        freshness = clamp01(1 - yearsOld / 6);
+      }
+    }
+
+    const channelScore = resource.channel_title ? 0.9 : 0.5;
+    return clamp01(lexical * 0.74 + freshness * 0.16 + channelScore * 0.1);
+  });
+
+  return aggregateTopScores(perItemScores);
+}
+
+function confidenceFromScore(score: number): Confidence {
+  if (score >= 0.68) return "high";
+  if (score >= 0.48) return "medium";
+  return "low";
+}
 
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -70,6 +152,80 @@ export default function HomePage() {
   const [backendWarmingUp, setBackendWarmingUp] = useState(false);
 
   const similarRef = useRef<HTMLDivElement>(null);
+
+  const resultIntelligence = useMemo(() => {
+    const courseQuality = estimateCourseQuality(courses, lastQuery);
+    const youtubeQuality = estimateYouTubeQuality(youtubeResources, lastQuery);
+    const courseConfidence = confidenceFromScore(courseQuality);
+    const youtubeConfidence = confidenceFromScore(youtubeQuality);
+
+    const hasCourses = courses.length > 0;
+    const hasYouTube = youtubeResources.length > 0;
+
+    const youtubeStronger =
+      hasYouTube &&
+      (!hasCourses || youtubeQuality > courseQuality + 0.08 || (courseConfidence === "low" && youtubeConfidence !== "low"));
+
+    const primarySource: "youtube" | "courses" = youtubeStronger ? "youtube" : "courses";
+
+    const summary = youtubeStronger
+      ? "YouTube currently has the strongest relevance for this query, so we surface those matches first and then show structured course options."
+      : "Structured course matches are currently strongest, so course options are shown first with YouTube resources as supporting material.";
+
+    let honestyNote: string | undefined;
+    if (hasYouTube && (courseConfidence === "low" || !hasCourses) && youtubeConfidence !== "low") {
+      honestyNote = `No high-confidence structured course matches were found for \"${lastQuery}\". YouTube currently has the strongest relevant results for this topic.`;
+    } else if (!hasYouTube && hasCourses) {
+      honestyNote = "Live YouTube results are limited for this query right now. Structured course options are prioritized.";
+    }
+
+    const courseHeading =
+      courseConfidence === "high" && !youtubeStronger
+        ? "Top Course Recommendations"
+        : courseConfidence === "medium"
+          ? "Structured Course Options"
+          : "Lower-confidence Course Matches";
+
+    const courseSubtitle =
+      courseConfidence === "high"
+        ? "High relevance structured courses from Udemy and Coursera."
+        : courseConfidence === "medium"
+          ? "Useful structured courses found, but relevance is mixed for this exact query."
+          : `No high-confidence structured course matches found for \"${lastQuery}\".`;
+
+    const courseStatusMessage =
+      courseConfidence === "low" && hasYouTube
+        ? "YouTube currently has stronger relevance for this topic. Explore related structured options below."
+        : undefined;
+
+    const youtubeHeading = youtubeStronger ? "Top Matches" : "Best YouTube Resources";
+    const youtubeDescription = youtubeStronger
+      ? "YouTube currently provides the strongest relevant matches for this query."
+      : "Targeted video resources that complement your structured course options.";
+
+    const youtubeStatusMessage =
+      youtubeConfidence === "high" && youtubeStronger
+        ? "These videos show strong query relevance and are prioritized first."
+        : youtubeConfidence === "low"
+          ? "Live YouTube relevance is limited for this query right now."
+          : undefined;
+
+    return {
+      courseQuality,
+      youtubeQuality,
+      courseConfidence,
+      youtubeConfidence,
+      primarySource,
+      summary,
+      honestyNote,
+      courseHeading,
+      courseSubtitle,
+      courseStatusMessage,
+      youtubeHeading,
+      youtubeDescription,
+      youtubeStatusMessage,
+    };
+  }, [courses, youtubeResources, lastQuery]);
 
   const getErrorMessage = (err: unknown): string => {
     if (err instanceof TimeoutError) {
@@ -287,9 +443,43 @@ export default function HomePage() {
     }
   };
 
+  const renderCourseSection = (
+    <CourseGrid
+      courses={courses}
+      onFindSimilar={handleFindSimilar}
+      onOpenDetail={setDetailCourse}
+      isLoading={isLoading}
+      hasSearched={hasSearched}
+      heading={resultIntelligence.courseHeading}
+      subtitle={resultIntelligence.courseSubtitle}
+      statusMessage={resultIntelligence.courseStatusMessage}
+      query={lastQuery}
+      responseTime={responseTime}
+      requestedCount={courseRequestedCount}
+      sourceCount={courseSourceCount}
+      sourceLabel="Structured Course Index"
+      emptyMessage="No high-confidence courses were found. Try broader keywords or fewer filters."
+      showSimilarButton={false}
+    />
+  );
+
+  const renderYouTubeSection = (
+    <YouTubeResources
+      resources={youtubeResources}
+      isLoading={isYouTubeLoading}
+      hasSearched={hasSearched}
+      warning={youtubeWarning}
+      requestedCount={youTubeRequestedCount}
+      sourceCount={youTubeSourceCount}
+      heading={resultIntelligence.youtubeHeading}
+      description={resultIntelligence.youtubeDescription}
+      statusMessage={resultIntelligence.youtubeStatusMessage}
+    />
+  );
+
   return (
     <div className="min-h-screen hero-bg transition-colors duration-300">
-      <header className="sticky top-0 z-50 border-b border-slate-200/50 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950/55 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-slate-200/50 bg-white/60 backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-950/55">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg shadow-sky-500/30">
@@ -303,7 +493,7 @@ export default function HomePage() {
 
           <div className="flex items-center gap-2">
             {isBackendReady ? (
-              <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-300/55 bg-emerald-100/75 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/30 dark:text-emerald-300">
+              <div className="hidden items-center gap-1.5 rounded-full border border-emerald-300/55 bg-emerald-100/75 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/30 dark:text-emerald-300 sm:inline-flex">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 AI Engine Ready
               </div>
@@ -333,16 +523,16 @@ export default function HomePage() {
 
           <div className="mx-auto mb-8 grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="glass-panel rounded-2xl px-4 py-3 text-left">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Primary Sources</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Primary sources</p>
               <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Udemy + Coursera</p>
             </div>
             <div className="glass-panel rounded-2xl px-4 py-3 text-left">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Support Source</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Live YouTube Videos</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Live support</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">YouTube videos and playlists</p>
             </div>
             <div className="glass-panel rounded-2xl px-4 py-3 text-left">
               <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Flow</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Search → Evaluate → Start Learning</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Search → Compare → Learn</p>
             </div>
           </div>
 
@@ -384,34 +574,31 @@ export default function HomePage() {
       )}
 
       <main className="mx-auto max-w-7xl space-y-10 px-4 pb-16 sm:px-6 lg:px-8">
-        <CourseGrid
-          courses={courses}
-          onFindSimilar={handleFindSimilar}
-          onOpenDetail={setDetailCourse}
-          isLoading={isLoading}
-          hasSearched={hasSearched}
-          heading="Top Course Recommendations"
-          query={lastQuery}
-          responseTime={responseTime}
-          requestedCount={courseRequestedCount}
-          sourceCount={courseSourceCount}
-          sourceLabel="Structured Course Index"
-          emptyMessage="No high-confidence courses were found. Try broader keywords or fewer filters."
-          showSimilarButton={false}
-        />
+        {hasSearched && !isLoading && !isYouTubeLoading ? (
+          <ResultsOverview
+            query={lastQuery}
+            responseTime={responseTime}
+            primarySource={resultIntelligence.primarySource}
+            courseCount={courses.length}
+            youtubeCount={youtubeResources.length}
+            courseConfidence={resultIntelligence.courseConfidence}
+            youtubeConfidence={resultIntelligence.youtubeConfidence}
+            summary={resultIntelligence.summary}
+            honestyNote={resultIntelligence.honestyNote}
+          />
+        ) : null}
 
-        {hasSearched && !isLoading && courses.length > 0 && (
-          <AIExplanation query={lastQuery} courses={courses} responseTime={responseTime} />
+        {resultIntelligence.primarySource === "youtube" ? (
+          <>
+            {renderYouTubeSection}
+            {renderCourseSection}
+          </>
+        ) : (
+          <>
+            {renderCourseSection}
+            {renderYouTubeSection}
+          </>
         )}
-
-        <YouTubeResources
-          resources={youtubeResources}
-          isLoading={isYouTubeLoading}
-          hasSearched={hasSearched}
-          warning={youtubeWarning}
-          requestedCount={youTubeRequestedCount}
-          sourceCount={youTubeSourceCount}
-        />
 
         <div ref={similarRef}>
           <CourseGrid
@@ -420,12 +607,17 @@ export default function HomePage() {
             onOpenDetail={setDetailCourse}
             isLoading={isSimilarLoading}
             hasSearched={hasSimilarSearched}
-            heading={similarHeading || "Related Courses"}
+            heading={similarHeading || "Related Course Matches"}
+            subtitle="Additional structured alternatives related to your selected course."
             sourceLabel="Similarity Engine"
             emptyMessage="No similar courses were found for the selected result."
             showSimilarButton={false}
           />
         </div>
+
+        {hasSearched && courses.length > 0 ? (
+          <AIExplanation query={lastQuery} courses={courses} responseTime={responseTime} />
+        ) : null}
       </main>
 
       {!hasSearched && (

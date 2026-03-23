@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Sparkles, Brain, Target, TrendingUp, BookOpen, Lightbulb } from "lucide-react";
 import { Course } from "@/services/api";
 
@@ -10,6 +11,7 @@ interface AIExplanationProps {
 }
 
 export default function AIExplanation({ query, courses, responseTime }: AIExplanationProps) {
+  const [open, setOpen] = useState(false);
   if (!query || courses.length === 0) return null;
 
   const platforms = Array.from(new Set(courses.map((c) => c.platform).filter(Boolean)));
@@ -45,28 +47,28 @@ export default function AIExplanation({ query, courses, responseTime }: AIExplan
   }
 
   return (
-    <div className="rounded-2xl overflow-hidden
-                    bg-gradient-to-br from-indigo-50/80 via-purple-50/50 to-white
-                    dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-gray-900/50
-                    border border-indigo-100 dark:border-indigo-900/50
-                    backdrop-blur-sm">
-      <div className="px-5 py-4 border-b border-indigo-100 dark:border-indigo-900/50
-                      flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600
-                        flex items-center justify-center shadow-md shadow-indigo-500/20">
-          <Sparkles className="w-4 h-4 text-white" />
+    <details
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+      className="rounded-2xl border border-slate-200/75 bg-white/70 backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-900/55"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-sky-500 shadow-md shadow-indigo-500/20">
+            <Sparkles className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">How we ranked these results</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Compact relevance explanation
+              {responseTime != null && ` · ${responseTime}ms`}
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-            Why these courses were recommended
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            AI-powered analysis of your search
-            {responseTime != null && ` · ${responseTime}ms`}
-          </p>
-        </div>
-      </div>
-      <div className="p-5 space-y-3">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{open ? "Hide" : "View"}</span>
+      </summary>
+
+      <div className="space-y-3 border-t border-slate-200/75 p-5 dark:border-slate-800/70">
         {explanations.map((exp, i) => (
           <div key={i} className="flex items-start gap-3">
             <div className="mt-0.5 w-6 h-6 rounded-md flex-shrink-0
@@ -80,6 +82,6 @@ export default function AIExplanation({ query, courses, responseTime }: AIExplan
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }

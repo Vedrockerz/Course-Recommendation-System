@@ -18,6 +18,8 @@ interface CourseGridProps {
   sourceCount?: number;
   sourceLabel?: string;
   emptyMessage?: string;
+  subtitle?: string;
+  statusMessage?: string;
 }
 
 function SkeletonCard() {
@@ -110,6 +112,8 @@ export default function CourseGrid({
   sourceCount,
   sourceLabel,
   emptyMessage = "Try broader keywords such as machine learning, data science, or web development.",
+  subtitle,
+  statusMessage,
 }: CourseGridProps) {
   if (isLoading) return <LoadingSkeleton />;
   if (!hasSearched) return null;
@@ -125,12 +129,19 @@ export default function CourseGrid({
               {sourceLabel || "Structured Recommendations"}
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{heading || "Top Course Recommendations"}</h2>
+            {subtitle ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{subtitle}</p> : null}
             {query ? (
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 Query: <span className="font-semibold text-sky-700 dark:text-sky-300">{query}</span>
               </p>
             ) : null}
             <CountExplanation requestedCount={requestedCount} sourceCount={sourceCount} shownCount={courses.length} />
+            {statusMessage ? (
+              <p className="mt-2 inline-flex items-start gap-1.5 rounded-xl border border-slate-300/70 bg-slate-100/70 px-2.5 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {statusMessage}
+              </p>
+            ) : null}
           </div>
 
           <div className="shrink-0 text-left sm:text-right">
