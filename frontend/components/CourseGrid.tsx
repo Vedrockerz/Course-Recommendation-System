@@ -1,6 +1,6 @@
 "use client";
 
-import { SearchX } from "lucide-react";
+import { SearchX, Info, Database } from "lucide-react";
 import { Course } from "@/services/api";
 import CourseCard from "./CourseCard";
 
@@ -14,35 +14,23 @@ interface CourseGridProps {
   query?: string;
   responseTime?: number | null;
   showSimilarButton?: boolean;
+  requestedCount?: number;
+  sourceCount?: number;
+  sourceLabel?: string;
+  emptyMessage?: string;
 }
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl overflow-hidden
-                    bg-white/70 dark:bg-gray-900/70 backdrop-blur-md
-                    border border-gray-200/60 dark:border-gray-800/60
-                    shadow-md animate-pulse">
-      <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-100
-                      dark:from-gray-800 dark:to-gray-850 relative">
-        <div className="absolute top-3 left-3 h-5 w-16 bg-gray-300 dark:bg-gray-700 rounded-lg" />
-        <div className="absolute top-3 right-3 h-5 w-12 bg-gray-300 dark:bg-gray-700 rounded-lg" />
-        <div className="absolute bottom-3 left-3 h-4 w-20 bg-gray-300 dark:bg-gray-700 rounded-md" />
+    <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white/75 shadow-md backdrop-blur-md animate-pulse dark:border-slate-800/70 dark:bg-slate-900/65">
+      <div className="relative aspect-video bg-gradient-to-br from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+        <div className="absolute left-3 top-3 h-5 w-16 rounded-lg bg-slate-300 dark:bg-slate-700" />
+        <div className="absolute right-3 top-3 h-5 w-12 rounded-lg bg-slate-300 dark:bg-slate-700" />
       </div>
-      <div className="p-4 space-y-3">
-        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded-lg w-[90%]" />
-        <div className="h-3.5 bg-gray-200 dark:bg-gray-800 rounded-lg w-[60%]" />
-        <div className="flex gap-2 pt-1">
-          <div className="h-5 w-14 bg-gray-200 dark:bg-gray-800 rounded-md" />
-          <div className="h-5 w-20 bg-gray-200 dark:bg-gray-800 rounded-md" />
-        </div>
-        <div className="flex items-center gap-1.5 pt-1">
-          <div className="h-3.5 w-3.5 bg-gray-200 dark:bg-gray-800 rounded" />
-          <div className="h-3 w-8 bg-gray-200 dark:bg-gray-800 rounded" />
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-3.5 w-3.5 bg-gray-200 dark:bg-gray-800 rounded" />
-          ))}
-        </div>
-        <div className="h-10 bg-gray-200 dark:bg-gray-800 rounded-xl mt-2" />
+      <div className="space-y-3 p-4">
+        <div className="h-4 w-[92%] rounded-lg bg-slate-200 dark:bg-slate-800" />
+        <div className="h-3.5 w-[68%] rounded-lg bg-slate-200 dark:bg-slate-800" />
+        <div className="h-9 rounded-xl bg-slate-200 dark:bg-slate-800" />
       </div>
     </div>
   );
@@ -51,13 +39,8 @@ function SkeletonCard() {
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Skeleton header */}
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-1 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
-        <div className="h-6 w-48 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
-        <div className="h-5 w-20 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="h-24 rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/60" />
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
@@ -66,24 +49,51 @@ function LoadingSkeleton() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="w-20 h-20 mb-6 rounded-2xl
-                      bg-gradient-to-br from-indigo-100 to-purple-100
-                      dark:from-indigo-900/40 dark:to-purple-900/40
-                      flex items-center justify-center shadow-inner">
-        <SearchX className="h-10 w-10 text-indigo-400 dark:text-indigo-500" />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-5 py-14 text-center dark:border-slate-700 dark:bg-slate-900/50">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-900/35 dark:text-sky-400">
+        <SearchX className="h-8 w-8" />
       </div>
-      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-        No courses found
-      </h3>
-      <p className="text-gray-500 dark:text-gray-400 max-w-sm text-sm leading-relaxed">
-        Try a different search term like &ldquo;machine learning&rdquo;,
-        &ldquo;web development&rdquo;, or &ldquo;data science&rdquo;.
-      </p>
+      <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">No course results found</h3>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-500 dark:text-slate-400">{message}</p>
     </div>
   );
+}
+
+function CountExplanation({
+  requestedCount,
+  sourceCount,
+  shownCount,
+}: {
+  requestedCount?: number;
+  sourceCount?: number;
+  shownCount: number;
+}) {
+  if (!requestedCount && sourceCount == null) return null;
+
+  const requested = requestedCount ?? shownCount;
+  const source = sourceCount ?? shownCount;
+
+  if (source < requested) {
+    return (
+      <p className="mt-2 inline-flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Requested {requested}, but only {source} highly relevant courses were returned.
+      </p>
+    );
+  }
+
+  if (shownCount < source) {
+    return (
+      <p className="mt-2 inline-flex items-start gap-1.5 rounded-xl border border-slate-300/70 bg-slate-100/80 px-2.5 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Showing {shownCount} of {source} results after filters.
+      </p>
+    );
+  }
+
+  return null;
 }
 
 export default function CourseGrid({
@@ -96,39 +106,45 @@ export default function CourseGrid({
   query,
   responseTime,
   showSimilarButton = true,
+  requestedCount,
+  sourceCount,
+  sourceLabel,
+  emptyMessage = "Try broader keywords such as machine learning, data science, or web development.",
 }: CourseGridProps) {
   if (isLoading) return <LoadingSkeleton />;
-
-  if (hasSearched && courses.length === 0) return <EmptyState />;
-
   if (!hasSearched) return null;
+  if (courses.length === 0) return <EmptyState message={emptyMessage} />;
 
   return (
-    <div>
-      {/* Results header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-gradient-to-b from-indigo-500 to-purple-600" />
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            {heading || "Recommended Courses"}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2 sm:ml-1">
-          <span className="text-sm font-medium text-gray-400 dark:text-gray-500">
-            {courses.length} {courses.length === 1 ? "course" : "courses"}
-            {query && (
-              <span> for <span className="text-indigo-600 dark:text-indigo-400 font-semibold">&apos;{query}&apos;</span></span>
-            )}
-          </span>
-          {responseTime != null && (
-            <span className="text-xs text-gray-400 dark:text-gray-600">
-              · {responseTime}ms
-            </span>
-          )}
+    <section>
+      <div className="glass-panel mb-6 rounded-2xl px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-slate-300/60 bg-white/65 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-900/55 dark:text-slate-300">
+              <Database className="h-3.5 w-3.5" />
+              {sourceLabel || "Structured Recommendations"}
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{heading || "Top Course Recommendations"}</h2>
+            {query ? (
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Query: <span className="font-semibold text-sky-700 dark:text-sky-300">{query}</span>
+              </p>
+            ) : null}
+            <CountExplanation requestedCount={requestedCount} sourceCount={sourceCount} shownCount={courses.length} />
+          </div>
+
+          <div className="shrink-0 text-left sm:text-right">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {courses.length} {courses.length === 1 ? "course" : "courses"} shown
+            </p>
+            {responseTime != null ? (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Response time: {responseTime}ms</p>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {courses.map((course, index) => (
           <CourseCard
             key={`${course.course_title}-${index}`}
@@ -139,6 +155,6 @@ export default function CourseGrid({
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }

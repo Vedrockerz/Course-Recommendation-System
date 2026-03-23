@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Star, ExternalLink, Copy, Clock, BarChart3, Users, Bookmark, BookmarkCheck, Zap } from "lucide-react";
 import { Course } from "@/services/api";
 
@@ -77,9 +78,12 @@ export default function CourseCard({
     >
       {/* ── Image ── */}
       <div className="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-800">
-        <img
+        <Image
           src={imageSrc}
           alt={course.course_title}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          unoptimized
           onError={() => setImgError(true)}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         />

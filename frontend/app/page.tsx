@@ -1,19 +1,42 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { BookOpen, Sun, Moon, Sparkles, Layers, Zap, Loader2, CheckCircle2 } from "lucide-react";
-import SearchBar from "@/components/SearchBar";
-import CourseGrid from "@/components/CourseGrid";
-import CourseDetailModal from "@/components/CourseDetailModal";
-import AIExplanation from "@/components/AIExplanation";
-import YouTubeResources from "@/components/YouTubeResources";
 import {
-  Course, Filters, SortOption, YouTubeResource,
-  checkBackendHealth, fetchRecommendations, fetchSimilarCourses, fetchYouTubeResources, sortCourses,
-  ApiError, TimeoutError, NetworkError, ServiceUnavailableError,
-  HealthStatus,
+  BookOpen,
+  Sun,
+  Moon,
+  Sparkles,
+  Layers,
+  Zap,
+  Loader2,
+  CheckCircle2,
+  ArrowRight,
+  PlayCircle,
+  GraduationCap,
+} from "lucide-react";
+import SearchBar from "../components/SearchBar";
+import CourseGrid from "../components/CourseGrid";
+import CourseDetailModal from "../components/CourseDetailModal";
+import AIExplanation from "../components/AIExplanation";
+import YouTubeResources from "../components/YouTubeResources";
+import {
+  Course,
+  Filters,
+  SortOption,
+  YouTubeResource,
+  checkBackendHealth,
+  fetchRecommendations,
+  fetchSimilarCourses,
+  fetchYouTubeResources,
+  sortCourses,
+  ApiError,
+  TimeoutError,
+  NetworkError,
+  ServiceUnavailableError,
 } from "@/services/api";
 import config from "@/services/config";
+
+const YOUTUBE_RESULT_CAP = 8;
 
 export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -34,6 +57,12 @@ export default function HomePage() {
   const [lastQuery, setLastQuery] = useState("");
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+
+  const [courseRequestedCount, setCourseRequestedCount] = useState<number>(10);
+  const [courseSourceCount, setCourseSourceCount] = useState<number>(0);
+  const [youTubeRequestedCount, setYouTubeRequestedCount] = useState<number>(6);
+  const [youTubeSourceCount, setYouTubeSourceCount] = useState<number>(0);
+
   const [isBackendReady, setIsBackendReady] = useState(false);
   const [isCheckingBackend, setIsCheckingBackend] = useState(true);
   const [backendRetryCount, setBackendRetryCount] = useState(0);
@@ -42,7 +71,6 @@ export default function HomePage() {
 
   const similarRef = useRef<HTMLDivElement>(null);
 
-  // Helper to convert API errors to user-friendly messages
   const getErrorMessage = (err: unknown): string => {
     if (err instanceof TimeoutError) {
       return "Request timed out. The service may be busy. Please try again.";
@@ -75,7 +103,6 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-
     const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const checkBackendUntilReady = async () => {
@@ -89,23 +116,20 @@ export default function HomePage() {
         const healthStatus = await checkBackendHealth();
         if (cancelled) return;
 
-        if (healthStatus) {
-          // Backend is reachable. Check if recommendation engine is actually ready
-          if (healthStatus.backend_ready) {
-            setIsBackendReady(true);
-            setIsCheckingBackend(false);
-            setBackendRetryCount(attempt - 1);
-            setBackendConnectionError(null);
-            setBackendWarmingUp(false);
-            return;
-          }
+        if (healthStatus?.backend_ready) {
+          setIsBackendReady(true);
+          setIsCheckingBackend(false);
+          setBackendRetryCount(attempt - 1);
+          setBackendConnectionError(null);
+          setBackendWarmingUp(false);
+          return;
+        }
 
-          // Backend is reachable but warming up
+        if (healthStatus) {
           setBackendWarmingUp(true);
           setIsBackendReady(false);
           setBackendRetryCount(attempt);
         } else {
-          // Cannot reach backend at all
           setBackendWarmingUp(false);
           setIsBackendReady(false);
           setBackendRetryCount(attempt);
@@ -160,6 +184,7 @@ export default function HomePage() {
     }
 
     setIsLoading(true);
+    setIsYouTubeLoading(true);
     setError(null);
     setHasSearched(true);
     setSimilarCourses([]);
@@ -171,12 +196,16 @@ export default function HomePage() {
     setResponseTime(null);
     setYoutubeResources([]);
     setYoutubeWarning(null);
-    setIsYouTubeLoading(true);
+
+    const requestedYouTube = Math.min(topK, YOUTUBE_RESULT_CAP);
+    setCourseRequestedCount(topK);
+    setYouTubeRequestedCount(requestedYouTube);
 
     const start = performance.now();
+
     try {
       const recommendationPromise = fetchRecommendations(query, filters, topK);
-      const youtubePromise = fetchYouTubeResources(query, Math.min(topK, 6));
+      const youtubePromise = fetchYouTubeResources(query, requestedYouTube);
       const [recommendationResult, youtubeResult] = await Promise.allSettled([
         recommendationPromise,
         youtubePromise,
@@ -184,20 +213,36 @@ export default function HomePage() {
 
       if (recommendationResult.status === "fulfilled") {
         const data = recommendationResult.value;
+        const filteredResults = applyClientFilters(data.results, filters, sort);
         const elapsed = Math.round(performance.now() - start);
+
         setResponseTime(elapsed);
-        setCourses(applyClientFilters(data.results, filters, sort));
-        if (data.count === 0) {
-          setError("No courses found for your query. Try different keywords.");
+        setCourseSourceCount(typeof data.count === "number" ? data.count : data.results.length);
+        setCourses(filteredResults);
+
+        if (filteredResults.length === 0) {
+          setError("No courses found for your query. Try different keywords or broader filters.");
         }
       } else {
         setError(getErrorMessage(recommendationResult.reason));
+        setCourseSourceCount(0);
         setCourses([]);
       }
 
       if (youtubeResult.status === "fulfilled") {
-        setYoutubeResources(youtubeResult.value.results);
+        const data = youtubeResult.value;
+        const found = data.results.length;
+
+        setYouTubeSourceCount(typeof data.count === "number" ? data.count : found);
+        setYoutubeResources(data.results);
+
+        if (found === 0) {
+          setYoutubeWarning("No relevant YouTube videos found for this topic right now.");
+        } else if (found < requestedYouTube) {
+          setYoutubeWarning(`Only ${found} relevant YouTube videos were found for this topic.`);
+        }
       } else {
+        setYouTubeSourceCount(0);
         setYoutubeResources([]);
         setYoutubeWarning("Live YouTube resources are temporarily unavailable.");
       }
@@ -221,18 +266,18 @@ export default function HomePage() {
 
     setIsSimilarLoading(true);
     setHasSimilarSearched(true);
-    setSimilarHeading(`Courses similar to "${courseName}"`);
+    setSimilarHeading(`More courses like \"${courseName}\"`);
     setError(null);
 
     setTimeout(() => {
-      similarRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+      similarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
 
     try {
       const data = await fetchSimilarCourses(courseName, lastFilters, lastTopK);
       setSimilarCourses(applyClientFilters(data.results, lastFilters, lastSort));
       if (data.count === 0) {
-        setError("No similar courses found. The course might not be available.");
+        setError("No similar courses found. The selected course may not be in the retrieval index.");
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -243,126 +288,118 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-purple-50/20
-                    dark:from-gray-950 dark:via-gray-950 dark:to-gray-900
-                    transition-colors duration-300">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-50 border-b
-                         bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl
-                         border-gray-200/80 dark:border-gray-800/80 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-screen hero-bg transition-colors duration-300">
+      <header className="sticky top-0 z-50 border-b border-slate-200/50 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950/55 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <BookOpen className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg shadow-sky-500/30">
+              <GraduationCap className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                AI Course Recommendation System
-              </h1>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-0.5">
-                Discover your next learning journey
-              </p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">LearnWise</h1>
+              <p className="-mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">AI course intelligence for focused learning</p>
             </div>
           </div>
-          <button
-            onClick={toggleDark}
-            className="p-2.5 rounded-xl
-                       bg-gray-100 dark:bg-gray-800
-                       text-gray-600 dark:text-gray-300
-                       hover:bg-gray-200 dark:hover:bg-gray-700
-                       transition-colors duration-200"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+
+          <div className="flex items-center gap-2">
+            {isBackendReady ? (
+              <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-300/55 bg-emerald-100/75 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                AI Engine Ready
+              </div>
+            ) : null}
+            <button
+              onClick={toggleDark}
+              className="rounded-xl border border-slate-300/60 bg-white/70 p-2.5 text-slate-600 transition-colors duration-200 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/75 dark:text-slate-300 dark:hover:bg-slate-900"
+              aria-label="Toggle dark mode"
+            >
+              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ── Hero ── */}
-      <section className="pt-16 pb-10 px-4">
-        <div className="max-w-4xl mx-auto text-center mb-10">
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white mb-4 tracking-tight">
-            Find the{" "}
-            <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              Perfect Course
-            </span>{" "}
-            for You
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-            Powered by AI to recommend the best courses from Udemy, Coursera, and
-            more. Just type what you want to learn.
-          </p>
+      <section className="px-4 pb-10 pt-12 sm:pt-16">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-8 text-center">
+            <p className="section-kicker mb-2">Premium AI Recommendation Platform</p>
+            <h2 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
+              Build your next skill path with curated courses and precise YouTube support
+            </h2>
+            <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg">
+              LearnWise combines structured course recommendations from Udemy and Coursera with live YouTube resources so you can learn faster with confidence.
+            </p>
+          </div>
 
-          {isBackendReady && (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5
-                            bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">AI Engine Ready</span>
+          <div className="mx-auto mb-8 grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="glass-panel rounded-2xl px-4 py-3 text-left">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Primary Sources</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Udemy + Coursera</p>
+            </div>
+            <div className="glass-panel rounded-2xl px-4 py-3 text-left">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Support Source</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Live YouTube Videos</p>
+            </div>
+            <div className="glass-panel rounded-2xl px-4 py-3 text-left">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Flow</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Search → Evaluate → Start Learning</p>
+            </div>
+          </div>
+
+          {!isBackendReady && isCheckingBackend && (
+            <div className="mx-auto mb-4 max-w-4xl rounded-2xl border border-sky-300/40 bg-white/65 px-4 py-3 shadow-sm backdrop-blur-xl dark:border-sky-800/55 dark:bg-slate-900/60">
+              <div className="flex items-center gap-3 text-sky-700 dark:text-sky-300">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <div className="text-sm font-medium sm:text-base">
+                  {backendWarmingUp ? "Recommendation engine is warming up..." : "Initializing AI Recommendation Engine..."}
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-sky-700/80 dark:text-sky-300/80">
+                {backendWarmingUp
+                  ? "Loading retrieval index and model artifacts. Please wait a few seconds..."
+                  : "Waiting for backend connection. Attempt: " + backendRetryCount}
+              </p>
             </div>
           )}
-        </div>
 
-        {!isBackendReady && isCheckingBackend && (
-          <div className="max-w-3xl mx-auto mb-4 rounded-2xl border border-indigo-200/70 dark:border-indigo-700/40
-                          bg-white/80 dark:bg-gray-900/70 backdrop-blur-xl px-4 py-3.5 shadow-sm">
-            <div className="flex items-center gap-3 text-indigo-700 dark:text-indigo-300">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <div className="text-sm sm:text-base font-medium">
-                {backendWarmingUp
-                  ? "Recommendation engine is warming up..."
-                  : "Initializing AI Recommendation Engine..."}
-              </div>
+          {backendConnectionError && (
+            <div className="mx-auto mb-4 max-w-4xl rounded-2xl border border-red-200 bg-red-50/85 px-4 py-3 dark:border-red-900/50 dark:bg-red-900/20">
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">{backendConnectionError}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                The backend may still be starting up. Refresh after your backend service is healthy.
+              </p>
             </div>
-            <p className="mt-1 text-xs text-indigo-600/80 dark:text-indigo-300/80">
-              {backendWarmingUp
-                ? "Loading models and indexes. Please wait a few seconds..."
-                : "Waiting for backend to respond. Attempt: " + backendRetryCount}
-            </p>
-          </div>
-        )}
+          )}
 
-        {backendConnectionError && (
-          <div className="max-w-3xl mx-auto mb-4 rounded-2xl border border-red-200 dark:border-red-800/50
-                          bg-red-50/80 dark:bg-red-900/20 px-4 py-3.5">
-            <p className="text-sm text-red-700 dark:text-red-300 font-medium">{backendConnectionError}</p>
-            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
-              The backend may be starting up. Please wait a moment and refresh the page.
-            </p>
-          </div>
-        )}
-
-        <SearchBar onSearch={handleSearch} isLoading={isLoading} isBackendReady={isBackendReady} />
+          <SearchBar onSearch={handleSearch} isLoading={isLoading} isBackendReady={isBackendReady} />
+        </div>
       </section>
 
-      {/* ── Error ── */}
       {error && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-          <div className="rounded-xl p-4 flex items-center gap-3
-                          bg-red-50 dark:bg-red-900/20
-                          border border-red-200 dark:border-red-800/50">
-            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
-            </svg>
-            <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
+        <div className="mx-auto mb-6 max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 dark:border-red-900/55 dark:bg-red-900/20">
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </div>
         </div>
       )}
 
-      {/* ── Results ── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 space-y-10">
+      <main className="mx-auto max-w-7xl space-y-10 px-4 pb-16 sm:px-6 lg:px-8">
         <CourseGrid
           courses={courses}
           onFindSimilar={handleFindSimilar}
           onOpenDetail={setDetailCourse}
           isLoading={isLoading}
           hasSearched={hasSearched}
-          heading={hasSearched && courses.length > 0 ? "Recommended Courses" : undefined}
+          heading="Top Course Recommendations"
           query={lastQuery}
           responseTime={responseTime}
+          requestedCount={courseRequestedCount}
+          sourceCount={courseSourceCount}
+          sourceLabel="Structured Course Index"
+          emptyMessage="No high-confidence courses were found. Try broader keywords or fewer filters."
           showSimilarButton={false}
         />
 
-        {/* AI Explanation */}
         {hasSearched && !isLoading && courses.length > 0 && (
           <AIExplanation query={lastQuery} courses={courses} responseTime={responseTime} />
         )}
@@ -372,6 +409,8 @@ export default function HomePage() {
           isLoading={isYouTubeLoading}
           hasSearched={hasSearched}
           warning={youtubeWarning}
+          requestedCount={youTubeRequestedCount}
+          sourceCount={youTubeSourceCount}
         />
 
         <div ref={similarRef}>
@@ -381,43 +420,64 @@ export default function HomePage() {
             onOpenDetail={setDetailCourse}
             isLoading={isSimilarLoading}
             hasSearched={hasSimilarSearched}
-            heading={similarHeading}
+            heading={similarHeading || "Related Courses"}
+            sourceLabel="Similarity Engine"
+            emptyMessage="No similar courses were found for the selected result."
             showSimilarButton={false}
           />
         </div>
       </main>
 
-      {/* ── Features (before search) ── */}
       {!hasSearched && (
-        <section className="max-w-5xl mx-auto px-4 pb-20">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
             {[
-              { Icon: Sparkles, title: "AI-Powered", desc: "Smart recommendations using advanced embedding models and similarity search" },
-              { Icon: Layers, title: "Multi-Platform", desc: "Courses from Udemy, Coursera, and other top learning platforms" },
-              { Icon: Zap, title: "Instant Results", desc: "Get personalized course recommendations in milliseconds" },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="group/card rounded-2xl p-6 border
-                           bg-white/60 dark:bg-gray-900/50 backdrop-blur-md
-                           border-gray-100 dark:border-gray-800
-                           shadow-sm hover:shadow-xl dark:hover:shadow-black/30
-                           hover:-translate-y-1
-                           transition-all duration-300"
+              {
+                Icon: Sparkles,
+                title: "AI-Powered Ranking",
+                desc: "Semantic retrieval and relevance scoring prioritize what matters for your learning goal.",
+              },
+              {
+                Icon: Layers,
+                title: "Cross-Source Discovery",
+                desc: "Blend structured courses with live YouTube context to quickly compare and decide.",
+              },
+              {
+                Icon: Zap,
+                title: "Fast Decision Flow",
+                desc: "From query to action in seconds with confidence indicators and clean result structure.",
+              },
+            ].map((feature) => (
+              <article
+                key={feature.title}
+                className="product-card rounded-2xl px-5 py-5 backdrop-blur-xl dark:bg-slate-900/55"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center mb-4
-                                group-hover/card:scale-110 transition-transform duration-300">
-                  <f.Icon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/15 to-teal-500/20 text-sky-600 dark:text-sky-300">
+                  <feature.Icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1">{f.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{f.desc}</p>
-              </div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{feature.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{feature.desc}</p>
+              </article>
             ))}
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-300/50 bg-white/70 px-3 py-1.5 dark:border-slate-700/70 dark:bg-slate-900/60">
+              <BookOpen className="h-4 w-4 text-sky-500" />
+              Trusted course catalogs
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-300/50 bg-white/70 px-3 py-1.5 dark:border-slate-700/70 dark:bg-slate-900/60">
+              <PlayCircle className="h-4 w-4 text-rose-500" />
+              Live YouTube support
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-300/50 bg-white/70 px-3 py-1.5 dark:border-slate-700/70 dark:bg-slate-900/60">
+              <ArrowRight className="h-4 w-4 text-teal-500" />
+              Clear recommendation flow
+            </span>
           </div>
         </section>
       )}
 
-      {/* ── Course Detail Modal ── */}
       <CourseDetailModal course={detailCourse} onClose={() => setDetailCourse(null)} />
     </div>
   );

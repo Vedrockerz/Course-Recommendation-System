@@ -2,13 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #f4f6f9;
+  --bg-soft: #eef2f6;
+  --surface: #ffffff;
+  --surface-strong: #f8fafc;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --brand: #0ea5e9;
+  --brand-strong: #0284c7;
+  --accent: #14b8a6;
+  --ring: rgba(14, 165, 233, 0.28);
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(148, 163, 184, 0.28);
+  --hero-gradient: radial-gradient(circle at 18% 20%, rgba(14, 165, 233, 0.2), transparent 40%),
+    radial-gradient(circle at 80% 15%, rgba(20, 184, 166, 0.16), transparent 44%),
+    linear-gradient(145deg, #f8fafc 0%, #eef6ff 42%, #f6fbfa 100%);
+  --elev-card: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --elev-card-hover: 0 16px 36px rgba(15, 23, 42, 0.16);
+}
+
+.dark {
+  --bg: #04070d;
+  --bg-soft: #0b1220;
+  --surface: #0f172a;
+  --surface-strong: #111c33;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --brand: #38bdf8;
+  --brand-strong: #0ea5e9;
+  --accent: #2dd4bf;
+  --ring: rgba(56, 189, 248, 0.34);
+  --glass: rgba(15, 23, 42, 0.56);
+  --glass-border: rgba(100, 116, 139, 0.25);
+  --hero-gradient: radial-gradient(circle at 22% 18%, rgba(14, 165, 233, 0.2), transparent 42%),
+    radial-gradient(circle at 84% 12%, rgba(45, 212, 191, 0.15), transparent 46%),
+    linear-gradient(145deg, #020617 0%, #071124 48%, #0a1426 100%);
+  --elev-card: 0 12px 34px rgba(2, 6, 23, 0.42);
+  --elev-card-hover: 0 22px 44px rgba(2, 6, 23, 0.58);
+}
+
 @layer base {
+  html,
+  body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+  }
+
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Smooth scrollbar */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading), var(--font-body), sans-serif;
+  }
+
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+    border-radius: 10px;
+  }
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -32,7 +92,37 @@
 }
 
 @layer utilities {
-  /* Simple CSS animations as fallback for Tailwind animate-in */
+  .glass-panel {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(14px);
+  }
+
+  .hero-bg {
+    background: var(--hero-gradient);
+  }
+
+  .product-card {
+    background: color-mix(in oklab, var(--surface) 78%, transparent);
+    border: 1px solid color-mix(in oklab, var(--glass-border) 88%, transparent);
+    box-shadow: var(--elev-card);
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  }
+
+  .product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--elev-card-hover);
+    border-color: color-mix(in oklab, var(--brand) 40%, var(--glass-border));
+  }
+
+  .section-kicker {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 0.72rem;
+    color: var(--brand-strong);
+  }
+
   .animate-in {
     animation: animateIn 0.3s ease-out;
   }

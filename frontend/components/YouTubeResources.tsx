@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, PlayCircle, ListVideo, Youtube, Clock3 } from "lucide-react";
+import Image from "next/image";
+import { ExternalLink, PlayCircle, ListVideo, Youtube, Clock3, Info } from "lucide-react";
 import { YouTubeResource } from "@/services/api";
 
 interface YouTubeResourcesProps {
@@ -8,6 +9,8 @@ interface YouTubeResourcesProps {
   isLoading: boolean;
   hasSearched: boolean;
   warning?: string | null;
+  requestedCount?: number;
+  sourceCount?: number;
 }
 
 function formatPublishedDate(rawDate?: string): string {
@@ -24,22 +27,18 @@ function formatPublishedDate(rawDate?: string): string {
 function YouTubeSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-1 rounded-full bg-red-300/80 dark:bg-red-700/80 animate-pulse" />
-        <div className="h-6 w-72 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="h-24 rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/60" />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-2xl overflow-hidden border border-gray-200/60 dark:border-gray-800/60
-                       bg-white/70 dark:bg-gray-900/60 backdrop-blur-md animate-pulse"
+            className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white/75 backdrop-blur-md animate-pulse dark:border-slate-800/70 dark:bg-slate-900/60"
           >
-            <div className="aspect-video bg-gray-200 dark:bg-gray-800" />
-            <div className="p-4 space-y-2.5">
-              <div className="h-4 w-[92%] bg-gray-200 dark:bg-gray-800 rounded" />
-              <div className="h-3.5 w-[65%] bg-gray-200 dark:bg-gray-800 rounded" />
-              <div className="h-3.5 w-[50%] bg-gray-200 dark:bg-gray-800 rounded" />
+            <div className="aspect-video bg-slate-200 dark:bg-slate-800" />
+            <div className="space-y-2.5 p-4">
+              <div className="h-4 w-[92%] rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="h-3.5 w-[65%] rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="h-3.5 w-[50%] rounded bg-slate-200 dark:bg-slate-800" />
             </div>
           </div>
         ))}
@@ -48,46 +47,69 @@ function YouTubeSkeleton() {
   );
 }
 
+function CountNote({ requestedCount, sourceCount, shownCount }: { requestedCount?: number; sourceCount?: number; shownCount: number }) {
+  const requested = requestedCount ?? shownCount;
+  const source = sourceCount ?? shownCount;
+
+  if (source < requested) {
+    return (
+      <p className="mt-2 inline-flex items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Requested {requested} videos, found {source} relevant YouTube matches.
+      </p>
+    );
+  }
+
+  return null;
+}
+
 export default function YouTubeResources({
   resources,
   isLoading,
   hasSearched,
   warning,
+  requestedCount,
+  sourceCount,
 }: YouTubeResourcesProps) {
   if (!hasSearched) return null;
   if (isLoading) return <YouTubeSkeleton />;
 
   return (
     <section>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-gradient-to-b from-red-500 to-rose-500" />
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-            <Youtube className="w-6 h-6 text-red-500" />
-            Latest YouTube Learning Resources
-          </h2>
+      <div className="glass-panel mb-5 rounded-2xl px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 dark:border-rose-800/40 dark:bg-rose-900/20 dark:text-rose-300">
+              <Youtube className="h-3.5 w-3.5" />
+              Live YouTube Source
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Best YouTube Videos</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Supplementary resources to deepen concepts from your top course matches.
+            </p>
+            <CountNote requestedCount={requestedCount} sourceCount={sourceCount} shownCount={resources.length} />
+          </div>
+
+          <div className="shrink-0 text-left sm:text-right">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {resources.length} {resources.length === 1 ? "video" : "videos"} shown
+            </p>
+          </div>
         </div>
-        <span className="text-sm font-medium text-gray-400 dark:text-gray-500">
-          {resources.length} {resources.length === 1 ? "resource" : "resources"}
-        </span>
       </div>
 
-      {warning && (
-        <div className="mb-4 rounded-xl p-3 text-sm
-                        bg-amber-50 dark:bg-amber-900/20
-                        border border-amber-200 dark:border-amber-800/40
-                        text-amber-700 dark:text-amber-300">
+      {warning ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300">
           {warning}
         </div>
-      )}
+      ) : null}
 
       {resources.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700
-                        px-5 py-8 text-sm text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-900/40">
-          No live YouTube resources found for this query right now.
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-5 py-8 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/45 dark:text-slate-400">
+          Only a few or no relevant YouTube videos are currently available for this exact topic. Try broader wording for more live matches.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {resources.map((item, index) => {
             const published = formatPublishedDate(item.published_date);
             const typeLabel = item.type === "playlist" ? "Playlist" : "Video";
@@ -99,61 +121,57 @@ export default function YouTubeResources({
                 href={resourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group block rounded-2xl overflow-hidden
-                           bg-white/70 dark:bg-gray-900/70 backdrop-blur-md
-                           border border-gray-200/60 dark:border-gray-800/60
-                           shadow-md hover:shadow-xl dark:shadow-black/20
-                           hover:-translate-y-1 transition-all duration-300"
+                className="group block overflow-hidden rounded-2xl border border-slate-200/70 bg-white/75 shadow-md backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-800/70 dark:bg-slate-900/65 dark:shadow-black/25"
               >
-                <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
                   {item.thumbnail ? (
-                    <img
+                    <Image
                       src={item.thumbnail}
                       alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      unoptimized
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <Youtube className="w-10 h-10" />
+                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                      <Youtube className="h-10 w-10" />
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
 
-                  <span className="absolute top-3 left-3 px-2 py-1 rounded-lg text-[11px] font-bold
-                                   bg-black/60 text-white backdrop-blur-sm inline-flex items-center gap-1">
-                    {item.type === "playlist" ? <ListVideo className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                    {item.type === "playlist" ? <ListVideo className="h-3.5 w-3.5" /> : <PlayCircle className="h-3.5 w-3.5" />}
                     {typeLabel}
                   </span>
                 </div>
 
                 <div className="p-4">
                   <h3
-                    className="text-[15px] font-bold leading-snug line-clamp-2
-                               text-gray-900 dark:text-gray-50
-                               group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors"
+                    className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 transition-colors group-hover:text-rose-600 dark:text-slate-50 dark:group-hover:text-rose-400"
                     title={item.title}
                   >
                     {item.title}
                   </h3>
 
-                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 line-clamp-2 min-h-[2.25rem]">
+                  <p className="mt-1 line-clamp-2 min-h-[2.25rem] text-xs text-slate-600 dark:text-slate-300">
                     {item.description || "Open this resource on YouTube to learn more."}
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                    <span className="truncate max-w-[62%]">{item.channel_title || "Unknown Channel"}</span>
-                    {published && (
-                      <span className="inline-flex items-center gap-1 shrink-0">
-                        <Clock3 className="w-3 h-3" />
+                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="max-w-[62%] truncate">{item.channel_title || "Unknown Channel"}</span>
+                    {published ? (
+                      <span className="inline-flex shrink-0 items-center gap-1">
+                        <Clock3 className="h-3 w-3" />
                         {published}
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 dark:text-red-400">
+                  <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rose-600 dark:text-rose-400">
                     Open on YouTube
-                    <ExternalLink className="w-4 h-4" />
+                    <ExternalLink className="h-4 w-4" />
                   </div>
                 </div>
               </a>
