@@ -50,7 +50,13 @@ class ContentRecommender:
 					logging.info("Lazy loading sentence transformer model: %s", self.model_name)
 					from sentence_transformers import SentenceTransformer
 
-					self.model = SentenceTransformer(self.model_name)
+					try:
+						# Prefer local cache to avoid remote metadata checks on startup.
+						self.model = SentenceTransformer(self.model_name, local_files_only=True)
+						logging.info("SentenceTransformer loaded from local cache")
+					except Exception:
+						logging.info("Local cache load unavailable; falling back to remote model fetch")
+						self.model = SentenceTransformer(self.model_name)
 					load_seconds = time.perf_counter() - load_start
 					logging.info("SentenceTransformer model loaded in %.2f seconds", load_seconds)
 			except Exception as exc:
@@ -69,6 +75,16 @@ class ContentRecommender:
 			raise RuntimeError("SentenceTransformer model is unavailable") from self._model_error
 
 		return self.model
+
+	def warmup(self):
+		"""Load the sentence model and run one tiny encode to reduce first-query latency."""
+		model = self.get_model()
+		try:
+			_ = model.encode(["warmup"], convert_to_numpy=True)
+			logging.info("Sentence transformer warmup encode completed")
+		except Exception:
+			logging.exception("Sentence transformer warmup encode failed")
+			raise
 
 	@staticmethod
 	def clean_query(text):

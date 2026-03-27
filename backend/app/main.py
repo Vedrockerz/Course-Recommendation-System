@@ -144,6 +144,10 @@ async def startup_event() -> None:
         app.state.title_lookup = artifacts["title_lookup"]
         app.state.content_model = artifacts["content_model"]
         app.state.hybrid_model = artifacts["hybrid_model"]
+
+        logging.info("Warming up sentence transformer model")
+        await asyncio.to_thread(app.state.content_model.warmup)
+
         app.state.is_ready = True
 
         logging.info("Backend ready for queries")
